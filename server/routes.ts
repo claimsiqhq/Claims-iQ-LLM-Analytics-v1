@@ -142,11 +142,44 @@ export async function registerRoutes(
 
       const newContext = mergeContext(context, intent, turnIndex, message);
 
-      const { data: rawData, queryMs, recordCount } = await executeMetricQuery(
-        intent,
-        validation.metric!,
-        client_id
-      );
+      let rawData: any[];
+      let queryMs: number;
+      let recordCount: number;
+      try {
+        const result = await executeMetricQuery(
+          intent,
+          validation.metric!,
+          client_id
+        );
+        rawData = result.data;
+        queryMs = result.queryMs;
+        recordCount = result.recordCount;
+      } catch (queryErr: any) {
+        log(`Query execution error: ${queryErr.message}`, "ask");
+        const errorTurn = await storage.createTurn({
+          thread_id: threadId,
+          turn_index: turnIndex,
+          user_message: message,
+          parsed_intent: intent,
+          intent_valid: true,
+          context_stack: newContext,
+          error_type: "query_error",
+          error_message: `Unable to run this analysis: ${queryErr.message}`,
+          suggested_alternatives: ["Try rephrasing your question", "Use a different metric or filter"],
+          llm_provider: intentLlm.provider,
+          llm_model: intentLlm.model,
+          llm_latency_ms: intentLlm.latencyMs,
+        });
+        return res.json({
+          thread_id: threadId,
+          turn_id: errorTurn.id,
+          error: {
+            type: "query_error",
+            message: "Unable to run this analysis. Try rephrasing your question or using different filters.",
+            suggestions: ["Try a different time range", "Remove specific filters", "Ask about a different metric"],
+          },
+        });
+      }
 
       const chartData = formatChartData(
         rawData,

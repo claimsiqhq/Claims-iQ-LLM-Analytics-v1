@@ -8,50 +8,80 @@ interface QueryResult {
   recordCount: number;
 }
 
+function sanitize(val: string | number): string {
+  if (typeof val === "number") return String(val);
+  return String(val).replace(/'/g, "''");
+}
+
 function buildWhereClause(
   intent: ParsedIntent,
   clientId: string
 ): { conditions: string; params: any[] } {
-  const conditions: string[] = [`client_id = '${clientId}'`];
+  const conditions: string[] = [`client_id = '${sanitize(clientId)}'`];
   const params: any[] = [];
 
   if (intent.time_range?.start && intent.time_range?.end) {
     conditions.push(
-      `fnol_date >= '${intent.time_range.start}'`,
-      `fnol_date <= '${intent.time_range.end}'`
+      `fnol_date >= '${sanitize(intent.time_range.start)}'`,
+      `fnol_date <= '${sanitize(intent.time_range.end)}'`
     );
   }
 
   for (const filter of intent.filters || []) {
+    const isAdjusterFilter = filter.field === "adjuster";
+
+    if (isAdjusterFilter) {
+      if (filter.operator === "eq") {
+        conditions.push(
+          `assigned_adjuster_id IN (SELECT id FROM adjusters WHERE LOWER(full_name) = LOWER('${sanitize(String(filter.value))}'))`
+        );
+      } else if (filter.operator === "neq") {
+        conditions.push(
+          `assigned_adjuster_id NOT IN (SELECT id FROM adjusters WHERE LOWER(full_name) = LOWER('${sanitize(String(filter.value))}'))`
+        );
+      } else if (filter.operator === "in" && Array.isArray(filter.value)) {
+        const vals = filter.value.map((v) => `LOWER('${sanitize(v)}')`).join(", ");
+        conditions.push(
+          `assigned_adjuster_id IN (SELECT id FROM adjusters WHERE LOWER(full_name) IN (${vals}))`
+        );
+      } else if (filter.operator === "not_in" && Array.isArray(filter.value)) {
+        const vals = filter.value.map((v) => `LOWER('${sanitize(v)}')`).join(", ");
+        conditions.push(
+          `assigned_adjuster_id NOT IN (SELECT id FROM adjusters WHERE LOWER(full_name) IN (${vals}))`
+        );
+      }
+      continue;
+    }
+
     const col = mapFilterFieldToColumn(filter.field);
     switch (filter.operator) {
       case "eq":
-        conditions.push(`${col} = '${filter.value}'`);
+        conditions.push(`${col} = '${sanitize(String(filter.value))}'`);
         break;
       case "neq":
-        conditions.push(`${col} != '${filter.value}'`);
+        conditions.push(`${col} != '${sanitize(String(filter.value))}'`);
         break;
       case "gt":
-        conditions.push(`${col} > '${filter.value}'`);
+        conditions.push(`${col} > '${sanitize(String(filter.value))}'`);
         break;
       case "gte":
-        conditions.push(`${col} >= '${filter.value}'`);
+        conditions.push(`${col} >= '${sanitize(String(filter.value))}'`);
         break;
       case "lt":
-        conditions.push(`${col} < '${filter.value}'`);
+        conditions.push(`${col} < '${sanitize(String(filter.value))}'`);
         break;
       case "lte":
-        conditions.push(`${col} <= '${filter.value}'`);
+        conditions.push(`${col} <= '${sanitize(String(filter.value))}'`);
         break;
       case "in":
         if (Array.isArray(filter.value)) {
-          const vals = filter.value.map((v) => `'${v}'`).join(", ");
+          const vals = filter.value.map((v) => `'${sanitize(v)}'`).join(", ");
           conditions.push(`${col} IN (${vals})`);
         }
         break;
       case "not_in":
         if (Array.isArray(filter.value)) {
-          const vals = filter.value.map((v) => `'${v}'`).join(", ");
+          const vals = filter.value.map((v) => `'${sanitize(v)}'`).join(", ");
           conditions.push(`${col} NOT IN (${vals})`);
         }
         break;
@@ -63,7 +93,6 @@ function buildWhereClause(
 
 function mapFilterFieldToColumn(field: string): string {
   const mapping: Record<string, string> = {
-    adjuster: "assigned_adjuster_id",
     stage: "current_stage",
     issue_type: "issue_types",
   };
@@ -344,24 +373,32 @@ export async function executeMetricQuery(
     query_text: sql,
   });
 
-  if (error) {
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("claims")
-      .select("*", { count: "exact", head: true })
-      .eq("client_id", clientId);
-
-    if (fallbackError) {
-      throw new Error(`Query failed: ${error.message}`);
-    }
-  }
-
   const queryMs = Date.now() - start;
+
+  if (error) {
+    console.error(`[queryCompiler] SQL error for ${metric.slug}:`, error.message);
+    console.error(`[queryCompiler] SQL was:`, sql);
+    throw new Error(`Query failed for ${metric.slug}: ${error.message}`);
+  }
 
   return {
     data: data || [],
     queryMs,
     recordCount: Array.isArray(data) ? data.length : 0,
   };
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatDateLabel(isoStr: string, grain: string): string {
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr;
+  const mon = MONTH_NAMES[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const year = d.getUTCFullYear();
+  if (grain === "month") return `${mon} ${year}`;
+  if (grain === "week") return `Week of ${mon} ${day}`;
+  return `${mon} ${day}`;
 }
 
 export function formatChartData(
@@ -375,14 +412,23 @@ export function formatChartData(
 } {
   const chartType = intent.chart_type || metric.default_chart_type;
 
+  const timeDims = new Set(["day", "week", "month"]);
+  const hasTimeDim = intent.dimensions?.some((d) => timeDims.has(d)) ?? false;
+  const timeDimGrain = intent.dimensions?.find((d) => timeDims.has(d));
+
   const labels = rawData.map((row) => {
     const dimKeys = Object.keys(row).filter((k) => k.startsWith("dim_"));
     if (dimKeys.length === 0) return metric.display_name;
     return dimKeys
-      .map((k) => {
+      .map((k, idx) => {
         const val = row[k];
-        if (val instanceof Date) return val.toISOString().split("T")[0];
-        return String(val ?? "Unknown");
+        if (val == null) return "Unknown";
+        const valStr = String(val);
+        if (idx === 0 && hasTimeDim && valStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+          return formatDateLabel(valStr, timeDimGrain || "day");
+        }
+        if (val instanceof Date) return formatDateLabel(val.toISOString(), "day");
+        return valStr;
       })
       .join(" / ");
   });
