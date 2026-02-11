@@ -13,7 +13,7 @@ const VALID_OPERATORS = [
 ];
 
 const VALID_CHART_TYPES = [
-  "line", "bar", "stacked_bar", "area", "pie", "table",
+  "line", "bar", "stacked_bar", "area", "pie", "table", "heatmap", "waterfall",
 ];
 
 const VALID_FILTER_FIELDS = [

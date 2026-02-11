@@ -62,7 +62,7 @@ ${metricList}
 eq, neq, gt, gte, lt, lte, in, not_in, between
 
 ## Chart Types
-line, bar, stacked_bar, area, pie, table
+line, bar, stacked_bar, area, pie, table, heatmap, waterfall
 
 ## Time Range Values
 last_7_days, last_14_days, last_30_days, last_60_days, last_90_days, last_6_months, last_12_months, this_month, this_quarter, this_year, ytd, all_time

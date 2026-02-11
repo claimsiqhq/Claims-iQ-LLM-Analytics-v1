@@ -368,3 +368,46 @@ VALUES
   ('total_expenses_per_claim', 'Total Expenses per Claim', 'financial', 'Average total billed expenses per claim', 'AVG(total_expenses)', 'currency', 'line', '{}', ARRAY['day','week','month'], true),
   ('expense_type_breakdown', 'Expense Type Breakdown', 'financial', 'Distribution of expenses by billing type', 'SUM by billing_type', 'currency', 'stacked_bar', '{}', ARRAY['day','week','month'], true)
 ON CONFLICT (slug) DO NOTHING;
+
+-- 16. Phase 4 & 5: Scheduled reports, dashboards, API keys, alert webhooks
+ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS webhook_url TEXT;
+
+CREATE TABLE IF NOT EXISTS scheduled_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  metric_slug TEXT NOT NULL,
+  schedule_cron TEXT NOT NULL,
+  recipients JSONB DEFAULT '[]',
+  last_run_at TIMESTAMPTZ,
+  next_run_at TIMESTAMPTZ,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS saved_dashboards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  layout JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  key_hash TEXT NOT NULL,
+  key_prefix TEXT NOT NULL,
+  name TEXT,
+  last_used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_reports_client ON scheduled_reports(client_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_reports_next ON scheduled_reports(next_run_at) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_saved_dashboards_client ON saved_dashboards(client_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_client ON api_keys(client_id);

@@ -177,6 +177,93 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
     );
   }
 
+  if (type === 'heatmap') {
+    const rows = datasets.map((ds) => ds.label);
+    const cols = labels;
+    const values = datasets.map((ds) => ds.values);
+    const flat = values.flat();
+    const minVal = Math.min(...flat);
+    const maxVal = Math.max(...flat);
+    const range = maxVal - minVal || 1;
+    const getColor = (v: number) => {
+      const pct = (v - minVal) / range;
+      const idx = Math.min(Math.floor(pct * (CHART_COLORS.length - 1)), CHART_COLORS.length - 1);
+      return CHART_COLORS[idx];
+    };
+    return (
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[400px] inline-block">
+          <div className="grid gap-0.5 p-2" style={{ gridTemplateColumns: `80px repeat(${cols.length}, 1fr)` }}>
+            <div className="col-span-1 row-span-1" />
+            {cols.map((c) => (
+              <div key={c} className="text-center text-xs font-medium text-text-secondary py-1 truncate" title={c}>
+                {c}
+              </div>
+            ))}
+            {rows.map((row, ri) => (
+              <React.Fragment key={ri}>
+                <div className="text-xs font-medium text-text-secondary py-1 truncate pr-1" title={row}>
+                  {row}
+                </div>
+                {cols.map((_, ci) => (
+                  <div
+                    key={ci}
+                    className="aspect-square min-w-[24px] rounded flex items-center justify-center text-xs font-mono"
+                    style={{ backgroundColor: getColor(values[ri][ci] ?? 0), color: values[ri][ci] != null ? '#fff' : 'transparent' }}
+                    title={`${row} × ${cols[ci]}: ${formatValue(values[ri][ci] ?? 0)}`}
+                  >
+                    {values[ri][ci] != null ? formatValue(values[ri][ci]) : '—'}
+                  </div>
+                ))}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'waterfall') {
+    const vals = datasets[0]?.values ?? [];
+    const running: number[] = [];
+    let sum = 0;
+    vals.forEach((v) => {
+      sum += v;
+      running.push(sum);
+    });
+    const waterfallData = labels.map((name, i) => ({
+      name,
+      value: vals[i] ?? 0,
+      cumulative: running[i] ?? 0,
+    }));
+    return (
+      <ResponsiveContainer width="100%" height={350}>
+        <BarChart data={waterfallData} margin={{ top: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
+          <XAxis {...xAxisProps} />
+          <YAxis {...yAxisProps} />
+          <Tooltip
+            {...tooltipProps}
+            content={({ active, payload }) =>
+              active && payload?.[0] ? (
+                <div className="bg-brand-deep-purple text-white rounded-lg px-3 py-2 text-sm shadow-lg">
+                  <p className="font-semibold">{payload[0].payload.name}</p>
+                  <p>Change: {formatValue(payload[0].payload.value)}</p>
+                  <p>Cumulative: {formatValue(payload[0].payload.cumulative)}</p>
+                </div>
+              ) : null
+            }
+          />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {waterfallData.map((entry, idx) => (
+              <Cell key={idx} fill={entry.value >= 0 ? CHART_COLORS[0] : CHART_COLORS[4]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
   if (type === 'line') {
     return (
       <ResponsiveContainer width="100%" height={350}>
@@ -273,7 +360,7 @@ interface CanvasProps {
   onFollowUpClick?: (question: string) => void;
 }
 
-const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table"] as const;
+const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table", "heatmap", "waterfall"] as const;
 
 export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "00000000-0000-0000-0000-000000000001", onFollowUpClick }: CanvasProps) => {
   const [drillDownOpen, setDrillDownOpen] = useState(false);

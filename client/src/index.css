@@ -46,6 +46,24 @@
   --radius-lg: 16px;
 }
 
+/* Dark theme overrides */
+.dark {
+  --color-background: #1a1525;
+  --color-foreground: #e8e0f0;
+  --color-surface-purple-light: #2d2438;
+  --color-surface-grey-lavender: #3d3548;
+  --color-surface-off-white: #1a1525;
+  --color-surface-white: #24202f;
+  --color-text-secondary: #9d8bbf;
+  --color-muted: #3d3548;
+  --color-muted-foreground: #9d8bbf;
+  --color-border: #3d3548;
+  --color-input: #24202f;
+  --color-accent: #4a3d5c;
+  --color-popover: #24202f;
+  --color-popover-foreground: #e8e0f0;
+}
+
 @layer base {
   * {
     @apply border-border;

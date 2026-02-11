@@ -1,6 +1,10 @@
 import { Router, Request, Response } from "express";
 import { anomalyDetector } from "../engine/anomalyDetector";
 import { supabase } from "../config/supabase";
+import { executeMetricQuery } from "../engine/queryCompiler";
+import { getMetricBySlug } from "../engine/metricRegistry";
+import { getMetrics } from "../engine/metricRegistry";
+import type { ParsedIntent } from "../llm/intentParser";
 
 const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -166,6 +170,7 @@ anomaliesRouter.get("/api/alert-rules", async (req: Request, res: Response) => {
         severity: r.severity,
         isActive: r.is_active,
         notificationChannels: r.notification_channels ?? [],
+        webhookUrl: r.webhook_url ?? null,
         createdAt: r.created_at,
       })),
     });
@@ -209,6 +214,7 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
       created_at: new Date().toISOString(),
     };
     if (name !== undefined) insertPayload.name = name;
+    if (req.body.webhookUrl !== undefined) insertPayload.webhook_url = req.body.webhookUrl;
 
     const { data: rule, error } = await supabase
       .from("alert_rules")
@@ -236,6 +242,7 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
         threshold: rule.threshold,
         severity: rule.severity,
         isActive: rule.is_active,
+        webhookUrl: rule.webhook_url ?? null,
         createdAt: rule.created_at,
       },
     });
@@ -262,6 +269,7 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
     if (req.body.threshold !== undefined) updates.threshold = req.body.threshold;
     if (req.body.severity !== undefined) updates.severity = req.body.severity;
     if (req.body.isActive !== undefined) updates.is_active = req.body.isActive;
+    if (req.body.webhookUrl !== undefined) updates.webhook_url = req.body.webhookUrl;
 
     const { data: rule, error } = await supabase
       .from("alert_rules")
@@ -297,6 +305,7 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
         threshold: rule.threshold,
         severity: rule.severity,
         isActive: rule.is_active,
+        webhookUrl: rule.webhook_url ?? null,
         updatedAt: new Date(),
       },
     });
@@ -304,6 +313,87 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
     console.error("Failed to update alert rule:", error);
     res.status(500).json({
       error: "Failed to update alert rule",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+anomaliesRouter.post("/api/alert-rules/execute", async (req: Request, res: Response) => {
+  try {
+    const clientId =
+      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+
+    const { data: rules, error: rulesError } = await supabase
+      .from("alert_rules")
+      .select("*")
+      .eq("client_id", clientId)
+      .eq("is_active", true)
+      .not("webhook_url", "is", null);
+
+    if (rulesError || !rules?.length) {
+      return res.json({ success: true, data: { fired: 0, evaluated: 0 } });
+    }
+
+    const fired: Array<{ ruleId: string; metricSlug: string; value: number; threshold: number }> = [];
+
+    const metrics = await getMetrics();
+
+    for (const rule of rules) {
+      const metric = getMetricBySlug(metrics, rule.metric_slug);
+      if (!metric) continue;
+
+      const intent: Partial<ParsedIntent> = {
+        metric: { slug: rule.metric_slug, display_name: metric.display_name },
+        dimensions: [],
+        filters: [],
+        time_range: { type: "relative", value: "last_30_days", start: "", end: "" },
+        comparison: null,
+        chart_type: "bar",
+        sort: null,
+        limit: null,
+        assumptions: [],
+        confidence: 1,
+      };
+      const result = await executeMetricQuery(intent as ParsedIntent, metric, clientId);
+      const row = result?.data?.[0];
+      const value = row?.value ?? (row ? Object.values(row)[0] : 0);
+      const numVal = typeof value === "number" ? value : parseFloat(String(value)) || 0;
+      const threshold = parseFloat(String(rule.threshold)) || 0;
+      let trigger = false;
+      if (rule.condition === "gt" && numVal > threshold) trigger = true;
+      if (rule.condition === "lt" && numVal < threshold) trigger = true;
+      if (rule.condition === "eq" && Math.abs(numVal - threshold) < 0.001) trigger = true;
+
+      if (trigger && rule.webhook_url) {
+        try {
+          await fetch(rule.webhook_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ruleId: rule.id,
+              metricSlug: rule.metric_slug,
+              condition: rule.condition,
+              threshold,
+              currentValue: numVal,
+              severity: rule.severity,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        } catch (e) {
+          console.error("Webhook delivery failed:", e);
+        }
+        fired.push({ ruleId: rule.id, metricSlug: rule.metric_slug, value: numVal, threshold });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { fired: fired.length, evaluated: rules.length },
+    });
+  } catch (error) {
+    console.error("Alert execution failed:", error);
+    res.status(500).json({
+      error: "Alert execution failed",
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }
