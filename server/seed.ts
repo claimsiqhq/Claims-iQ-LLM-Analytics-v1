@@ -1,13 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
-
-function getClient() {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
-}
+import { getSupabaseClient } from "./config/supabase";
 
 const CLIENT_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -191,7 +182,7 @@ function generateLLMUsage(claims: any[]): any[] {
 }
 
 export async function runSeed(): Promise<void> {
-  const supabase = getClient();
+  const supabase = getSupabaseClient();
 
   console.log("Seeding data into Supabase...");
 
