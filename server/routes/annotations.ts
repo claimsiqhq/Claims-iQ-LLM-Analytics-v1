@@ -10,7 +10,7 @@ annotationsRouter.get("/api/threads/:threadId/annotations", async (req: Request,
     const threadId = req.params.threadId;
 
     const { data: annotations, error } = await supabase
-      .from("thread_annotations")
+      .from("thread_notes")
       .select("*")
       .eq("thread_id", threadId)
       .order("created_at", { ascending: true });
@@ -51,7 +51,7 @@ annotationsRouter.post("/api/threads/:threadId/annotations", async (req: Request
     }
 
     const { data: annotation, error } = await supabase
-      .from("thread_annotations")
+      .from("thread_notes")
       .insert({
         thread_id: threadId,
         turn_id: turnId || null,
@@ -96,7 +96,7 @@ annotationsRouter.patch("/api/threads/:threadId/annotations/:id", async (req: Re
     }
 
     const { data: annotation, error } = await supabase
-      .from("thread_annotations")
+      .from("thread_notes")
       .update({ note: note.trim() })
       .eq("id", id)
       .eq("thread_id", threadId)
@@ -130,7 +130,7 @@ annotationsRouter.delete("/api/threads/:threadId/annotations/:id", async (req: R
     const { threadId, id } = req.params;
 
     const { error } = await supabase
-      .from("thread_annotations")
+      .from("thread_notes")
       .delete()
       .eq("id", id)
       .eq("thread_id", threadId);

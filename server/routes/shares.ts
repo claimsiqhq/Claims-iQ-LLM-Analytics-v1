@@ -25,7 +25,7 @@ sharesRouter.post("/api/threads/:id/share", async (req: Request, res: Response) 
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     const { data: share, error } = await supabase
-      .from("thread_shares")
+      .from("thread_share_links")
       .insert({
         thread_id: threadId,
         share_token: shareToken,
@@ -65,7 +65,7 @@ sharesRouter.get("/api/share/:token", async (req: Request, res: Response) => {
     const token = req.params.token;
 
     const { data: share, error } = await supabase
-      .from("thread_shares")
+      .from("thread_share_links")
       .select("*, threads(*)")
       .eq("share_token", token)
       .gt("expires_at", new Date().toISOString())

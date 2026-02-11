@@ -10,7 +10,7 @@ scheduledReportsRouter.get("/api/scheduled-reports", async (req: Request, res: R
     const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
 
     const { data, error } = await supabase
-      .from("scheduled_reports")
+      .from("scheduled_metric_reports")
       .select("*")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
@@ -53,7 +53,7 @@ scheduledReportsRouter.post("/api/scheduled-reports", async (req: Request, res: 
     }
 
     const { data, error } = await supabase
-      .from("scheduled_reports")
+      .from("scheduled_metric_reports")
       .insert({
         client_id: clientId,
         title,
@@ -100,7 +100,7 @@ scheduledReportsRouter.patch("/api/scheduled-reports/:id", async (req: Request, 
     if (req.body.isActive !== undefined) updates.is_active = req.body.isActive;
 
     const { data, error } = await supabase
-      .from("scheduled_reports")
+      .from("scheduled_metric_reports")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("client_id", clientId)
@@ -136,7 +136,7 @@ scheduledReportsRouter.delete("/api/scheduled-reports/:id", async (req: Request,
     const id = req.params.id;
 
     const { error } = await supabase
-      .from("scheduled_reports")
+      .from("scheduled_metric_reports")
       .delete()
       .eq("id", id)
       .eq("client_id", clientId);
