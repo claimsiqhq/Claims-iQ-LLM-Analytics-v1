@@ -1,29 +1,26 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import React, { useState } from 'react';
+import { ContextBar } from "@/components/ContextBar";
+import { ChatPanel } from "@/components/ChatPanel";
+import { Canvas } from "@/components/Canvas";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-
-function Router() {
-  return (
-    <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
 
 function App() {
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <div className="min-h-screen bg-surface-off-white font-body text-brand-deep-purple selection:bg-brand-purple-light overflow-hidden">
+      <ContextBar />
+      <div className="flex h-screen overflow-hidden">
+        <ChatPanel 
+          activeThreadId={activeThreadId} 
+          onThreadSelect={setActiveThreadId} 
+        />
+        <main className="flex-1 h-full overflow-y-auto w-full relative">
+          <Canvas activeThreadId={activeThreadId} />
+        </main>
+      </div>
+      <Toaster />
+    </div>
   );
 }
 
