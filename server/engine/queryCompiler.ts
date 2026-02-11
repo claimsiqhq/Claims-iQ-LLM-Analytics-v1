@@ -193,7 +193,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id LEFT JOIN clients cl ON c.client_id = cl.id WHERE c.client_id = '${clientId}' AND c.status IN ('open', 'in_progress') ${groupBy}`;
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id LEFT JOIN clients cl ON c.client_id = cl.id WHERE c.client_id = '${sanitize(clientId)}' AND c.status IN ('open', 'in_progress') ${groupBy}`;
   },
 
   cycle_time_e2e: (intent, clientId) => {
@@ -218,7 +218,7 @@ const METRIC_QUERIES: Record<
       ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
       : "";
     const groupBy = ["sh.stage", ...dimCols].join(", ");
-    return `SELECT sh.stage as dim_0, ${selectDims}AVG(sh.dwell_days) as value FROM claim_stage_history sh JOIN claims c ON sh.claim_id = c.id LEFT JOIN adjusters a ON sh.adjuster_id = a.id WHERE c.client_id = '${clientId}' GROUP BY ${groupBy} ORDER BY value DESC`;
+    return `SELECT sh.stage as dim_0, ${selectDims}AVG(sh.dwell_days) as value FROM claim_stage_history sh JOIN claims c ON sh.claim_id = c.id LEFT JOIN adjusters a ON sh.adjuster_id = a.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY ${groupBy} ORDER BY value DESC`;
   },
 
   time_to_first_touch: (intent, clientId) => {
@@ -284,7 +284,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}COUNT(*) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id LEFT JOIN adjusters a ON cr.reviewer_id = a.id WHERE c.client_id = '${clientId}' AND cr.review_type = 're_review' ${groupBy}`;
+    return `SELECT ${selectDims}COUNT(*) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id LEFT JOIN adjusters a ON cr.reviewer_id = a.id WHERE c.client_id = '${sanitize(clientId)}' AND cr.review_type = 're_review' ${groupBy}`;
   },
 
   human_override_rate: (intent, clientId) => {
@@ -298,7 +298,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN cr.human_override THEN 1.0 ELSE 0.0 END)::numeric, 4) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN cr.human_override THEN 1.0 ELSE 0.0 END)::numeric, 4) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' ${groupBy}`;
   },
 
   tokens_per_claim: (intent, clientId) => {
@@ -312,7 +312,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}AVG(lu.input_tokens + lu.output_tokens) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+    return `SELECT ${selectDims}AVG(lu.input_tokens + lu.output_tokens) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' ${groupBy}`;
   },
 
   cost_per_claim: (intent, clientId) => {
@@ -339,7 +339,7 @@ const METRIC_QUERIES: Record<
       ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", "
       : "";
     const groupBy = ["lu.model", ...extraDims].join(", ");
-    return `SELECT lu.model as dim_0, ${selectExtra}COUNT(*) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' GROUP BY ${groupBy} ORDER BY value DESC`;
+    return `SELECT lu.model as dim_0, ${selectExtra}COUNT(*) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY ${groupBy} ORDER BY value DESC`;
   },
 
   llm_latency: (intent, clientId) => {
@@ -353,7 +353,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}AVG(lu.latency_ms) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+    return `SELECT ${selectDims}AVG(lu.latency_ms) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' ${groupBy}`;
   },
 
   severity_distribution: (intent, clientId) => {
