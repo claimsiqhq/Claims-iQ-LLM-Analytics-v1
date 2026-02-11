@@ -286,7 +286,7 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
   };
   if (isLoading && !currentResponse) {
     return (
-      <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center">
+      <div className="min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center">
         <Loader2 className="w-12 h-12 text-brand-purple animate-spin mb-4" />
         <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
       </div>
@@ -295,7 +295,7 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
 
   if (!activeThreadId || activeThreadId === 'new' || !currentResponse) {
     return (
-      <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+      <div className="min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
         <div className="max-w-md">
           <img src={emptyStateImg} alt="No Data" className="w-64 h-64 object-contain mx-auto opacity-90 mix-blend-multiply mb-6" />
           <h1 className="type-h1 text-brand-deep-purple mb-3" data-testid="text-hero-title">
@@ -316,7 +316,7 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
 
   if (currentResponse.error) {
     return (
-      <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white p-8">
+      <div className="min-h-screen bg-surface-off-white p-8">
         <div className="max-w-[1000px] mx-auto">
           <div className="bg-white border-l-4 border-status-alert p-6 rounded-r-xl shadow-sm">
             <h2 className="type-h2 text-brand-deep-purple mb-2">Unable to Process</h2>
@@ -340,7 +340,7 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
   }
 
   return (
-    <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white p-8">
+    <div className="min-h-screen bg-surface-off-white p-8">
       <div className="max-w-[1000px] mx-auto space-y-8">
         {currentResponse.insight && (
           <div className="bg-white border-l-4 border-brand-purple p-6 rounded-r-xl shadow-sm animate-in slide-in-from-bottom-4 duration-500" data-testid="insight-summary">
