@@ -127,11 +127,11 @@ export async function registerRoutes(
           context = lastTurn.context_stack as ThreadContext;
         }
       } else {
-        const session = await storage.getOrCreateSession(userId, client_id);
+        const session = await storage.getOrCreateSession(userId, resolvedClientId);
         const thread = await storage.createThread(
           session.id,
           userId,
-          client_id,
+          resolvedClientId,
           message.slice(0, 80)
         );
         threadId = thread.id;
@@ -179,7 +179,7 @@ export async function registerRoutes(
       let recordCount: number;
       const cacheKey = queryCache.generateCacheKey(
         validation.metric!.slug,
-        client_id,
+        resolvedClientId,
         { filters: intent.filters, dimensions: intent.dimensions },
         intent.time_range?.value || "last_30_days",
         { start: intent.time_range?.start, end: intent.time_range?.end }
@@ -197,7 +197,7 @@ export async function registerRoutes(
           const result = await executeMetricQuery(
             intent,
             validation.metric!,
-            client_id
+            resolvedClientId
           );
           rawData = result.data;
           queryMs = result.queryMs;
@@ -205,7 +205,7 @@ export async function registerRoutes(
           await queryCache.setCachedResult(
             cacheKey,
             validation.metric!.slug,
-            client_id,
+            resolvedClientId,
             rawData,
             15
           );
@@ -256,7 +256,7 @@ export async function registerRoutes(
         const compResult = await executeMetricQuery(
           compIntent,
           validation.metric!,
-          client_id
+          resolvedClientId
         );
         chartData = formatChartDataForComparison(
           rawData,

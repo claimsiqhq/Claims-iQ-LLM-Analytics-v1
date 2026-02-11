@@ -1,7 +1,8 @@
 import { getSupabaseClient } from "./config/supabase";
+import crypto from "crypto";
 
-const CLIENT_ID = "00000000-0000-0000-0000-000000000001";
-const USER_ID = "00000000-0000-0000-0000-000000000001";
+const CLIENT_ID = crypto.randomUUID();
+const USER_ID = crypto.randomUUID();
 
 const METRIC_DEFINITIONS = [
   { slug: "claims_received", display_name: "Claims Received", category: "throughput", description: "Total number of new claims filed in the selected period", calculation: "COUNT(*) FROM claims WHERE fnol_date BETWEEN start AND end", unit: "count", default_chart_type: "line", allowed_dimensions: ["day", "week", "month", "peril", "region"], allowed_time_grains: ["day", "week", "month"] },
