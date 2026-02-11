@@ -90,9 +90,7 @@ CREATE TABLE IF NOT EXISTS claim_stage_history (
   entered_at TIMESTAMPTZ NOT NULL,
   exited_at TIMESTAMPTZ,
   adjuster_id UUID REFERENCES adjusters(id),
-  dwell_days DECIMAL(6,2) GENERATED ALWAYS AS (
-    EXTRACT(EPOCH FROM (COALESCE(exited_at, now()) - entered_at)) / 86400.0
-  ) STORED
+  dwell_days DECIMAL(6,2)
 );
 
 -- 6. Reviews

@@ -268,6 +268,9 @@ export async function runSeed(): Promise<void> {
       entered_at: sh.entered_at,
       exited_at: sh.exited_at,
       adjuster_id: sh.adjuster_id,
+      dwell_days: sh.exited_at
+        ? Math.round(((new Date(sh.exited_at).getTime() - new Date(sh.entered_at).getTime()) / 86400000) * 100) / 100
+        : Math.round(((Date.now() - new Date(sh.entered_at).getTime()) / 86400000) * 100) / 100,
     })).filter((r) => r.claim_id);
     if (batch.length) {
       const { error } = await supabase.from("claim_stage_history").insert(batch);
