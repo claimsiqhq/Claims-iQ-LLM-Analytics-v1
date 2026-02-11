@@ -12,6 +12,7 @@ import {
   type ThreadContext,
 } from "./engine/contextManager";
 import { log } from "./index";
+import { runSeed } from "./seed";
 
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
 const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
@@ -20,8 +21,29 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const { supabase } = await import("./config/supabase");
+      const { data, error } = await supabase.from("metric_definitions").select("slug", { count: "exact", head: true });
+      res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        database: error ? "not_seeded" : "connected",
+      });
+    } catch {
+      res.json({ status: "ok", timestamp: new Date().toISOString(), database: "error" });
+    }
+  });
+
+  app.post("/api/seed", async (_req, res) => {
+    try {
+      log("Starting database seed...", "seed");
+      await runSeed();
+      res.json({ status: "ok", message: "Database seeded successfully" });
+    } catch (err: any) {
+      log(`Seed error: ${err.message}`, "seed");
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get("/api/metrics", async (_req, res) => {
