@@ -1,0 +1,760 @@
+# Claims IQ Analytics — Backend Development Prompt (Layer 1)
+
+> **Runtime:** Node.js + Express on Replit
+> **Database:** Supabase (PostgreSQL + Row Level Security + Realtime)
+> **LLM:** Provider-flexible — abstract behind an adapter so we can swap between Anthropic Claude and OpenAI GPT-4
+> **Data Seeding:** Parse real PDF claim documents → extract structured claim data → populate Supabase
+> **Scope:** This prompt covers the foundational backend — schema, API skeleton, LLM intent layer, and data ingestion pipeline. It does NOT cover the frontend.
+
+---
+
+## 1. What This Backend Does
+
+Claims IQ Analytics is a **chat-first analytics interface**. The backend's job is:
+
+1. **Accept natural language questions** from a Claims Manager (e.g., "Show me SLA breach rate this month by adjuster")
+2. **Translate intent via LLM** into a structured JSON chart specification (metric, dimensions, filters, time range, chart type, assumptions)
+3. **Validate the chart spec** against an allow-list of known metrics and dimensions — the LLM never generates SQL
+4. **Compile a parameterized query** from the validated spec and execute it against Supabase
+5. **Return structured chart data + an LLM-generated insight summary** to the frontend
+6. **Manage conversation threads** with context stacks so follow-up questions refine the current analysis
+7. **Support drill-down** from aggregate metrics to individual claim records
+
+The LLM is an **intent translator**, not a query generator. It produces structured JSON. The backend validates and compiles. This is a hard architectural boundary.
+
+---
+
+## 2. Supabase Schema
+
+### 2.1 Tenancy & Users
+
+```sql
+-- Organizations / Clients whose claims we manage
+CREATE TABLE clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,                    -- e.g., "Acme Insurance Group"
+  slug TEXT UNIQUE NOT NULL,             -- e.g., "acme-insurance"
+  config JSONB DEFAULT '{}',             -- client-specific settings
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Users of Claims IQ Analytics (our internal staff)
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('claims_manager', 'team_lead', 'adjuster', 'executive', 'admin')),
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Which clients a user can access
+CREATE TABLE user_client_access (
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, client_id)
+);
+```
+
+### 2.2 Claims Data (Core Domain)
+
+This is the data that the analytics layer queries against. Designed to support every metric defined in the UX spec (throughput, SLA, quality, cost, risk).
+
+```sql
+-- The central claims table
+CREATE TABLE claims (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  claim_number TEXT NOT NULL,             -- human-readable claim ID (e.g., "CLM-2024-00847")
+  claimant_name TEXT,
+
+  -- Classification
+  peril TEXT NOT NULL,                    -- e.g., "Water Damage", "Fire", "Theft", "Wind/Hail", "Liability"
+  severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  region TEXT,                            -- e.g., "Southeast", "Northeast", "Midwest", "West"
+  state_code TEXT,                        -- e.g., "FL", "TX", "CA"
+
+  -- Lifecycle
+  status TEXT NOT NULL CHECK (status IN ('open', 'in_progress', 'review', 'closed', 'reopened')),
+  current_stage TEXT NOT NULL,            -- e.g., "fnol", "investigation", "evaluation", "negotiation", "settlement", "closed"
+
+  -- Assignments
+  assigned_adjuster_id UUID REFERENCES adjusters(id),
+  assigned_at TIMESTAMPTZ,
+
+  -- Dates
+  fnol_date TIMESTAMPTZ NOT NULL,        -- First Notice of Loss
+  first_touch_at TIMESTAMPTZ,            -- First action taken
+  closed_at TIMESTAMPTZ,
+
+  -- Financials
+  reserve_amount DECIMAL(12,2),
+  paid_amount DECIMAL(12,2),
+
+  -- SLA
+  sla_target_days INTEGER,               -- SLA threshold in days for this claim type
+  sla_breached BOOLEAN DEFAULT FALSE,
+
+  -- Flags
+  has_issues BOOLEAN DEFAULT FALSE,
+  issue_types TEXT[],                     -- e.g., ['documentation_gap', 'coverage_dispute', 'fraud_indicator']
+  reopen_count INTEGER DEFAULT 0,
+
+  -- Metadata
+  source_document_id UUID,               -- reference to the ingested PDF
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE(client_id, claim_number)
+);
+
+-- Adjusters (the people handling claims)
+CREATE TABLE adjusters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  full_name TEXT NOT NULL,
+  email TEXT,
+  team TEXT,                              -- e.g., "Team Alpha", "Team Beta"
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Stage history for dwell time calculations
+CREATE TABLE claim_stage_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  entered_at TIMESTAMPTZ NOT NULL,
+  exited_at TIMESTAMPTZ,                  -- NULL if claim is currently in this stage
+  adjuster_id UUID REFERENCES adjusters(id),
+
+  -- Computed (can be generated column or app-level)
+  dwell_days DECIMAL(6,2) GENERATED ALWAYS AS (
+    EXTRACT(EPOCH FROM (COALESCE(exited_at, now()) - entered_at)) / 86400.0
+  ) STORED
+);
+
+-- Review / rework tracking
+CREATE TABLE claim_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  review_type TEXT NOT NULL,              -- e.g., "quality_review", "supervisor_review", "re_review"
+  reviewer_id UUID REFERENCES adjusters(id),
+  outcome TEXT,                           -- e.g., "approved", "returned", "escalated"
+  llm_decision TEXT,                      -- what the LLM recommended (if applicable)
+  human_override BOOLEAN DEFAULT FALSE,   -- did human override the LLM?
+  override_reason TEXT,
+  reviewed_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- LLM usage per claim (for cost & token metrics)
+CREATE TABLE claim_llm_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  model TEXT NOT NULL,                    -- e.g., "claude-sonnet-4-5-20250929", "gpt-4o"
+  stage TEXT NOT NULL,                    -- which processing stage used the LLM
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cost_usd DECIMAL(8,4),
+  latency_ms INTEGER,
+  called_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Source documents (the PDFs we ingest)
+CREATE TABLE source_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  filename TEXT NOT NULL,
+  file_path TEXT,                         -- Supabase Storage path
+  document_type TEXT,                     -- e.g., "loss_run", "claim_file", "adjuster_report"
+  page_count INTEGER,
+  parsed_at TIMESTAMPTZ,
+  parse_status TEXT DEFAULT 'pending' CHECK (parse_status IN ('pending', 'processing', 'completed', 'failed')),
+  parse_errors JSONB,
+  uploaded_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 2.3 Conversations & Threads
+
+```sql
+-- A session scoped to one user + one client
+CREATE TABLE sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  started_at TIMESTAMPTZ DEFAULT now(),
+  last_active_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- A thread is a chain of related questions forming an investigation
+CREATE TABLE threads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  title TEXT,                             -- auto-set from first question
+  is_pinned BOOLEAN DEFAULT FALSE,
+  pin_order INTEGER,                      -- for drag-and-drop reordering of pinned threads
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Each turn in a thread (question + response pair)
+CREATE TABLE thread_turns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  turn_index INTEGER NOT NULL,            -- sequential within thread (0, 1, 2, ...)
+
+  -- The user's question
+  user_message TEXT NOT NULL,
+
+  -- LLM intent parsing output
+  parsed_intent JSONB,                    -- the structured chart spec (see Section 4)
+  intent_valid BOOLEAN,
+  validation_errors JSONB,
+
+  -- Assumptions the LLM made
+  assumptions JSONB,                      -- e.g., [{"key": "time_range", "value": "last_30_days", "label": "Last 30 days"}]
+
+  -- The context stack at this point (accumulated filters, dimensions, etc.)
+  context_stack JSONB,                    -- full accumulated context for threaded refinement
+
+  -- Response data
+  chart_data JSONB,                       -- the actual data points for rendering
+  chart_type TEXT,                        -- line, bar, stacked_bar, area, pie, table
+  insight_summary TEXT,                   -- LLM-generated insight paragraph
+
+  -- Error handling
+  error_type TEXT,                        -- null if success; 'vague', 'unsupported', 'no_data', 'system_error'
+  error_message TEXT,
+  suggested_alternatives TEXT[],
+
+  -- Metadata
+  llm_provider TEXT,                      -- 'anthropic' or 'openai'
+  llm_model TEXT,
+  llm_latency_ms INTEGER,
+  query_latency_ms INTEGER,              -- time to execute the compiled SQL
+  data_freshness_seconds INTEGER,
+
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 2.4 Metric Registry (Allow-List)
+
+This is the backbone of the validation layer. The LLM's output is checked against this registry. If a metric or dimension isn't registered here, the request is rejected.
+
+```sql
+CREATE TABLE metric_definitions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT UNIQUE NOT NULL,              -- e.g., "sla_breach_rate"
+  display_name TEXT NOT NULL,             -- e.g., "SLA Breach Rate"
+  category TEXT NOT NULL,                 -- "throughput", "speed_sla", "quality", "cost_llm", "risk"
+  description TEXT NOT NULL,              -- human-readable definition
+  calculation TEXT NOT NULL,              -- SQL template or formula description
+  unit TEXT,                              -- e.g., "percentage", "count", "days", "dollars", "tokens"
+  default_chart_type TEXT NOT NULL,       -- default visualization type
+  allowed_dimensions TEXT[] NOT NULL,     -- e.g., ['adjuster', 'peril', 'region', 'stage', 'severity']
+  allowed_time_grains TEXT[] DEFAULT ARRAY['day', 'week', 'month'],
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Seed the 14 V1 metrics from the UX spec:
+-- Throughput: claims_received, claims_in_progress, queue_depth
+-- Speed & SLA: cycle_time_e2e, stage_dwell_time, time_to_first_touch, sla_breach_rate, sla_breach_count
+-- Quality: issue_rate, re_review_count, human_override_rate
+-- Cost & LLM: tokens_per_claim, cost_per_claim, model_mix, llm_latency
+-- Risk: severity_distribution, high_severity_trend
+```
+
+### 2.5 Row Level Security (Supabase RLS)
+
+```sql
+-- Enable RLS on all tables
+ALTER TABLE claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE thread_turns ENABLE ROW LEVEL SECURITY;
+
+-- Claims: users can only see claims for clients they have access to
+CREATE POLICY "Users see claims for their accessible clients"
+  ON claims FOR SELECT
+  USING (
+    client_id IN (
+      SELECT client_id FROM user_client_access
+      WHERE user_id = auth.uid()
+    )
+  );
+
+-- Threads: users see only their own threads
+CREATE POLICY "Users see their own threads"
+  ON threads FOR ALL
+  USING (user_id = auth.uid());
+
+-- Thread turns: users see turns in their own threads
+CREATE POLICY "Users see turns in their own threads"
+  ON thread_turns FOR ALL
+  USING (
+    thread_id IN (
+      SELECT id FROM threads WHERE user_id = auth.uid()
+    )
+  );
+```
+
+### 2.6 Indexes for Analytics Performance
+
+```sql
+-- Claims: the most-queried table
+CREATE INDEX idx_claims_client_id ON claims(client_id);
+CREATE INDEX idx_claims_status ON claims(client_id, status);
+CREATE INDEX idx_claims_fnol_date ON claims(client_id, fnol_date);
+CREATE INDEX idx_claims_peril ON claims(client_id, peril);
+CREATE INDEX idx_claims_region ON claims(client_id, region);
+CREATE INDEX idx_claims_adjuster ON claims(client_id, assigned_adjuster_id);
+CREATE INDEX idx_claims_severity ON claims(client_id, severity);
+CREATE INDEX idx_claims_sla ON claims(client_id, sla_breached);
+CREATE INDEX idx_claims_stage ON claims(client_id, current_stage);
+
+-- Stage history: for dwell time queries
+CREATE INDEX idx_stage_history_claim ON claim_stage_history(claim_id);
+CREATE INDEX idx_stage_history_stage ON claim_stage_history(stage, entered_at);
+
+-- Threads: for conversation retrieval
+CREATE INDEX idx_threads_user_client ON threads(user_id, client_id, created_at DESC);
+CREATE INDEX idx_threads_pinned ON threads(user_id, is_pinned) WHERE is_pinned = TRUE;
+
+-- Thread turns: for context loading
+CREATE INDEX idx_turns_thread ON thread_turns(thread_id, turn_index);
+```
+
+---
+
+## 3. Project Structure (Replit)
+
+```
+claims-iq-analytics/
+├── package.json
+├── .env                          # Supabase URL, keys, LLM API keys
+├── src/
+│   ├── index.js                  # Express app entry point
+│   ├── config/
+│   │   ├── supabase.js           # Supabase client init
+│   │   └── env.js                # Environment variable validation
+│   ├── middleware/
+│   │   ├── auth.js               # JWT verification (Supabase Auth)
+│   │   ├── clientContext.js      # Extracts & validates active client_id from headers
+│   │   └── errorHandler.js       # Global error handler
+│   ├── routes/
+│   │   ├── conversations.js      # POST /ask, GET /threads, PATCH /threads/:id/pin
+│   │   ├── drilldown.js          # GET /drilldown/:metric
+│   │   ├── export.js             # GET /export/csv, GET /export/png (V1 stretch)
+│   │   ├── clients.js            # GET /clients (user's accessible clients)
+│   │   └── health.js             # GET /health
+│   ├── llm/
+│   │   ├── adapter.js            # LLM provider abstraction (swap Claude ↔ GPT-4)
+│   │   ├── providers/
+│   │   │   ├── anthropic.js      # Claude-specific implementation
+│   │   │   └── openai.js         # OpenAI-specific implementation
+│   │   ├── intentParser.js       # Sends NLQ → LLM → returns structured intent JSON
+│   │   ├── insightGenerator.js   # Sends chart data → LLM → returns insight paragraph
+│   │   └── prompts/
+│   │       ├── intentSystem.md   # System prompt for intent parsing
+│   │       └── insightSystem.md  # System prompt for insight generation
+│   ├── engine/
+│   │   ├── validator.js          # Validates intent JSON against metric_definitions allow-list
+│   │   ├── queryCompiler.js      # Compiles validated intent into parameterized SQL
+│   │   ├── contextManager.js     # Manages thread context stack (accumulates filters, dimensions)
+│   │   └── metricRegistry.js     # Loads metric_definitions from Supabase, caches in memory
+│   ├── ingestion/
+│   │   ├── pdfParser.js          # Extract text/tables from PDFs (pdf-parse or similar)
+│   │   ├── claimExtractor.js     # LLM-assisted: PDF text → structured claim records
+│   │   └── seeder.js             # Orchestrates: upload PDF → parse → extract → insert into Supabase
+│   └── utils/
+│       ├── logger.js
+│       └── freshness.js          # Computes data freshness per metric
+├── prompts/
+│   ├── intent-system.md          # Full system prompt for NLQ → intent
+│   └── insight-system.md         # Full system prompt for data → insight
+├── seeds/
+│   ├── metrics.js                # Seeds the 14 V1 metric definitions
+│   ├── clients.js                # Seeds test client(s)
+│   └── users.js                  # Seeds test user(s)
+└── tests/
+    ├── validator.test.js
+    ├── queryCompiler.test.js
+    └── contextManager.test.js
+```
+
+---
+
+## 4. LLM Intent Contract (The JSON Schema)
+
+When the user asks a question, the LLM must produce a JSON object conforming to this schema. This is the contract between the NLQ layer and the query engine.
+
+```json
+{
+  "intent_type": "query | refine | drill_down | compare | new_topic",
+  "metric": {
+    "slug": "sla_breach_rate",
+    "display_name": "SLA Breach Rate"
+  },
+  "dimensions": ["adjuster"],
+  "filters": [
+    { "field": "region", "operator": "eq", "value": "Southeast" },
+    { "field": "peril", "operator": "eq", "value": "Water Damage" }
+  ],
+  "time_range": {
+    "type": "relative",
+    "value": "last_30_days",
+    "start": "2026-01-12",
+    "end": "2026-02-11"
+  },
+  "comparison": null,
+  "chart_type": "bar",
+  "sort": { "field": "value", "direction": "desc" },
+  "limit": null,
+  "assumptions": [
+    { "key": "time_range", "assumed_value": "last_30_days", "label": "Last 30 days" },
+    { "key": "grouping", "assumed_value": "adjuster", "label": "By adjuster" }
+  ],
+  "confidence": 0.92
+}
+```
+
+### Intent Types
+
+| Type | Meaning | Context Stack Action |
+|---|---|---|
+| `query` | New, standalone question | Start fresh context |
+| `refine` | Modifies the current chart (add dimension, change time, swap chart type) | Merge into existing context |
+| `drill_down` | User wants the individual records behind an aggregate | Preserve context, switch to detail view |
+| `compare` | Add a comparison range or series | Extend context with comparison params |
+| `new_topic` | System detects the question is unrelated to current thread | Start new thread |
+
+### Validation Rules (validator.js)
+
+1. `metric.slug` must exist in `metric_definitions` and be `is_active = true`
+2. Every entry in `dimensions` must be in that metric's `allowed_dimensions`
+3. Every `filter.field` must be a valid column or dimension
+4. `filter.operator` must be one of: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `not_in`, `between`
+5. `chart_type` must be one of: `line`, `bar`, `stacked_bar`, `area`, `pie`, `table`
+6. `time_range` must resolve to a valid date range
+7. If validation fails → return error with specific guidance (which field failed, what's allowed)
+
+---
+
+## 5. Core API Endpoints
+
+### 5.1 `POST /api/ask`
+
+The primary endpoint. Accepts a natural language question and returns chart data + insight.
+
+**Request:**
+```json
+{
+  "message": "Show me SLA breach rate this month by adjuster",
+  "thread_id": null,
+  "client_id": "uuid-of-active-client"
+}
+```
+
+- If `thread_id` is null → create new thread
+- If `thread_id` is provided → load context stack from previous turns and include in LLM prompt
+
+**Processing Flow:**
+1. Load thread context (if `thread_id` provided)
+2. Build LLM prompt: system prompt + metric registry summary + thread context + user message
+3. Call LLM via adapter → get intent JSON
+4. Validate intent against allow-list (validator.js)
+5. If invalid → return error with guidance
+6. Compile parameterized SQL from validated intent (queryCompiler.js)
+7. Execute query against Supabase
+8. Send chart data + original question to insight generator LLM call
+9. Persist thread_turn to database
+10. Return response
+
+**Response:**
+```json
+{
+  "thread_id": "uuid",
+  "turn_id": "uuid",
+  "chart": {
+    "type": "bar",
+    "data": {
+      "labels": ["Sarah Chen", "Mike Torres", "Lisa Park", "..."],
+      "datasets": [
+        {
+          "label": "SLA Breach Rate",
+          "values": [0.23, 0.15, 0.08, "..."],
+          "unit": "percentage"
+        }
+      ]
+    },
+    "title": "SLA Breach Rate by Adjuster — Last 30 Days"
+  },
+  "insight": "Sarah Chen's breach rate of 23% is nearly 3× the team average...",
+  "assumptions": [
+    { "key": "time_range", "value": "last_30_days", "label": "Last 30 days", "editable": true }
+  ],
+  "metadata": {
+    "metric_definition": "Percentage of claims exceeding SLA threshold",
+    "filters_applied": [],
+    "time_range": { "start": "2026-01-12", "end": "2026-02-11" },
+    "data_freshness_seconds": 120,
+    "record_count": 847,
+    "query_ms": 45,
+    "llm_ms": 1200
+  }
+}
+```
+
+### 5.2 `GET /api/threads`
+
+Returns the user's threads for the active client, grouped for the sidebar.
+
+**Response:**
+```json
+{
+  "pinned": [
+    { "id": "uuid", "title": "SLA breach rate by adjuster", "chart_type": "bar", "updated_at": "...", "pin_order": 0 }
+  ],
+  "today": [ ... ],
+  "this_week": [ ... ],
+  "earlier": [ ... ]
+}
+```
+
+### 5.3 `GET /api/threads/:id`
+
+Returns full thread with all turns (for loading a thread's conversation history).
+
+### 5.4 `PATCH /api/threads/:id/pin`
+
+Toggle pin status. Body: `{ "is_pinned": true, "pin_order": 0 }`
+
+### 5.5 `GET /api/drilldown`
+
+Returns individual claim records for a given aggregate slice.
+
+**Query params:** `metric`, `filters` (JSON), `time_range`, `sort`, `page`, `page_size`
+
+**Response:** Paginated list of claim records with summary stats (count, avg age, breach %).
+
+### 5.6 `GET /api/clients`
+
+Returns clients accessible to the authenticated user.
+
+### 5.7 `GET /api/metrics`
+
+Returns the full metric registry (for frontend autocomplete & prompt chips).
+
+---
+
+## 6. LLM Provider Adapter Pattern
+
+```
+adapter.js
+├── createCompletion(provider, { systemPrompt, userMessage, responseFormat })
+│   ├── if provider === 'anthropic' → call anthropic.js
+│   └── if provider === 'openai'    → call openai.js
+│
+├── Provider interface (each provider implements):
+│   ├── parseIntent(systemPrompt, context, userMessage) → intentJSON
+│   └── generateInsight(systemPrompt, chartData, userMessage) → insightText
+```
+
+**Environment variables:**
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+LLM_PROVIDER=anthropic          # default provider; can be overridden per-request
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...     # service role key for server-side operations
+SUPABASE_ANON_KEY=eyJ...        # anon key for client-side auth
+```
+
+---
+
+## 7. Context Manager (Threaded Refinement)
+
+The context manager maintains a **stack** that accumulates across turns within a thread. Each refinement merges into the existing context rather than replacing it.
+
+```
+Turn 0: "Show me SLA breach rate this month"
+  → context: { metric: sla_breach_rate, time: last_30_days, dimensions: [], filters: [] }
+
+Turn 1: "Break that down by adjuster"
+  → context: { metric: sla_breach_rate, time: last_30_days, dimensions: [adjuster], filters: [] }
+
+Turn 2: "Just the Southeast region"
+  → context: { metric: sla_breach_rate, time: last_30_days, dimensions: [adjuster], filters: [region=Southeast] }
+
+Turn 3: "Compare to last month"
+  → context: { ...same, comparison: { type: prior_period, offset: 1_month } }
+```
+
+The LLM receives the current context stack along with the new message, and its intent JSON output represents the **delta** (what changed). The context manager merges the delta into the accumulated context and passes the full merged context to the query compiler.
+
+**Undo** pops the most recent delta off the stack and re-queries with the previous context.
+
+---
+
+## 8. PDF Ingestion Pipeline
+
+Since the seed data comes from real PDF claim documents, the ingestion pipeline is a critical piece.
+
+### 8.1 Flow
+
+```
+Upload PDF → Store in Supabase Storage → Extract text (pdf-parse) →
+Send text to LLM with extraction prompt → Get structured claim JSON →
+Validate & normalize → Insert into claims + related tables
+```
+
+### 8.2 Extraction Strategy
+
+Use the LLM to extract structured data from unstructured PDF text. The extraction prompt should ask the LLM to produce an array of claim records, each conforming to the claims table schema.
+
+**LLM extraction prompt should specify:**
+- Required fields: claim_number, claimant_name, peril, severity, status, current_stage, fnol_date, region
+- Optional fields: reserve_amount, paid_amount, assigned_adjuster, sla_target_days, issue_types
+- Date format normalization: output ISO 8601
+- Severity mapping rules: map whatever terms the document uses to our enum (low/medium/high/critical)
+- Stage mapping rules: map to our stage enum (fnol/investigation/evaluation/negotiation/settlement/closed)
+
+### 8.3 Synthetic Enrichment
+
+After extracting the core claim records from PDFs, generate synthetic but realistic supplementary data to fill out the analytics model:
+
+- **Stage history:** For each claim, generate a realistic stage progression timeline based on the claim's age and current stage
+- **Reviews:** Generate 0–3 review records per claim with realistic outcomes
+- **LLM usage:** Generate token counts and costs per claim per stage
+- **Adjuster assignments:** Create a pool of ~10–15 adjusters per client and distribute claims realistically (some adjusters busier than others to create interesting analytics)
+- **SLA calculations:** Compute `sla_breached` based on `fnol_date`, `closed_at` (or current date if open), and `sla_target_days`
+
+This enrichment should produce data that makes the 14 V1 metrics meaningful and interesting — with visible trends, outliers, and patterns that the Claims Manager would want to investigate.
+
+### 8.4 Key npm Packages for Ingestion
+
+- `pdf-parse` — extract text from PDFs
+- `@supabase/supabase-js` — database operations
+- Anthropic SDK (`@anthropic-ai/sdk`) or OpenAI SDK (`openai`) — for LLM extraction
+
+---
+
+## 9. Metric Seed Data
+
+Seed the `metric_definitions` table with these 14 V1 metrics:
+
+| Slug | Display Name | Category | Default Chart | Allowed Dimensions |
+|---|---|---|---|---|
+| `claims_received` | Claims Received | throughput | line | day, week, month, peril, region |
+| `claims_in_progress` | Claims In Progress | throughput | stacked_bar | stage, adjuster, peril |
+| `queue_depth` | Queue Depth | throughput | bar | priority, carrier |
+| `cycle_time_e2e` | Cycle Time (E2E) | speed_sla | line | peril, region, severity, adjuster |
+| `stage_dwell_time` | Stage Dwell Time | speed_sla | stacked_bar | stage, adjuster |
+| `time_to_first_touch` | Time to First Touch | speed_sla | bar | adjuster, peril |
+| `sla_breach_rate` | SLA Breach Rate | speed_sla | line | adjuster, peril, region, stage |
+| `sla_breach_count` | SLA Breach Count | speed_sla | bar | adjuster, peril, region, stage |
+| `issue_rate` | Issue Rate | quality | bar | issue_type, adjuster, stage |
+| `re_review_count` | Re-Review Count | quality | bar | adjuster, peril, severity |
+| `human_override_rate` | Human Override Rate | quality | bar | stage, decision_type |
+| `tokens_per_claim` | Tokens per Claim | cost_llm | bar | stage, model |
+| `cost_per_claim` | Cost per Claim | cost_llm | line | stage, peril, model |
+| `model_mix` | Model Mix | cost_llm | pie | stage |
+| `llm_latency` | LLM Latency | cost_llm | line | model, stage |
+| `severity_distribution` | Severity Distribution | risk | bar | peril, region |
+| `high_severity_trend` | High-Severity Trend | risk | line | peril, region |
+
+---
+
+## 10. Environment & Config
+
+### 10.1 Required Environment Variables
+
+```
+# Supabase
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+SUPABASE_ANON_KEY=
+
+# LLM
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+LLM_PROVIDER=anthropic    # or "openai"
+
+# App
+PORT=3000
+NODE_ENV=development
+LOG_LEVEL=debug
+```
+
+### 10.2 Replit-Specific Notes
+
+- Use Replit Secrets for all API keys (never commit .env)
+- The Express server should bind to `0.0.0.0` on the port Replit provides
+- Use `nodemon` or Replit's auto-restart for development
+- Consider Replit's built-in PostgreSQL if Supabase setup becomes complex, but Supabase is preferred for RLS and Realtime subscriptions
+
+---
+
+## 11. Implementation Order (Suggested)
+
+Build in this sequence — each step is testable independently:
+
+### Phase 1: Foundation
+1. Initialize Express project with folder structure
+2. Set up Supabase client and environment config
+3. Run schema migrations (create all tables)
+4. Seed metric definitions (14 metrics)
+5. Seed a test client and test user
+6. `GET /api/health` and `GET /api/metrics` endpoints working
+
+### Phase 2: Data Ingestion
+7. Build PDF parser (pdf-parse → raw text)
+8. Build LLM claim extractor (raw text → structured JSON)
+9. Build seeder (JSON → Supabase inserts for claims + related tables)
+10. Ingest provided PDF documents
+11. Generate synthetic enrichment data (stage history, reviews, LLM usage, adjusters)
+12. Verify data by running raw SQL queries in Supabase dashboard
+
+### Phase 3: Intent Engine
+13. Write the intent system prompt (prompts/intent-system.md)
+14. Build LLM adapter with Anthropic + OpenAI providers
+15. Build intent parser (intentParser.js)
+16. Build validator (check intent against metric registry)
+17. Build query compiler (validated intent → parameterized SQL)
+18. Test the full chain: NLQ → intent → validate → SQL → data
+
+### Phase 4: Conversation API
+19. `POST /api/ask` — full round-trip (question → chart data + insight)
+20. Build context manager for threaded refinement
+21. `GET /api/threads` and `GET /api/threads/:id`
+22. `PATCH /api/threads/:id/pin`
+23. Build insight generator (chart data → LLM → insight summary)
+
+### Phase 5: Drill-Down & Polish
+24. `GET /api/drilldown` — individual claims for a given aggregate slice
+25. Data freshness calculation
+26. Error handling and edge cases (vague queries, unsupported metrics, no data)
+27. Basic logging and request tracing
+
+---
+
+## 12. Key Architectural Decisions (Rationale)
+
+| Decision | Rationale |
+|---|---|
+| **LLM produces JSON, not SQL** | Security (no injection), auditability (every intent logged), validation possible before execution |
+| **Metric allow-list** | Controls exactly what the system can answer. New metrics are added to the registry, not to LLM prompts |
+| **Context stack, not full re-interpretation** | Threaded refinement stays predictable. The LLM only interprets the delta, not the entire thread |
+| **Provider adapter pattern** | Swap LLM providers without touching business logic. Test with cheaper models, deploy with stronger ones |
+| **Supabase RLS** | Tenant isolation is enforced at the database level, not just application level. Defense in depth |
+| **PDF → LLM extraction** | Unstructured claim documents don't have consistent formats. LLM extraction is more resilient than regex/template parsing |
+| **Synthetic enrichment** | Real PDFs give us claims but not stage histories or LLM usage logs. Synthetic data fills the analytics model so all 14 metrics work |
+
+---
+
+*End of Backend Development Prompt — Claims IQ Analytics Layer 1*
