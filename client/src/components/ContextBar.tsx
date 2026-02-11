@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavArrowDown } from 'iconoir-react';
+import logo from "@/assets/logo.png";
 
 export const ContextBar = () => {
   return (
@@ -8,7 +9,7 @@ export const ContextBar = () => {
       <div className="flex items-center gap-6">
         {/* Logo */}
         <div className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden">
-          <img src="/attached_assets/ClaimsIQ_Logo_02-09_1770799240990.png" alt="Claims IQ Logo" className="w-full h-full object-contain" />
+          <img src={logo} alt="Claims IQ Logo" className="w-full h-full object-contain" />
         </div>
         
         {/* Separator */}
@@ -16,12 +17,12 @@ export const ContextBar = () => {
 
         {/* Client Selector */}
         <button className="flex items-center gap-2 text-white hover:text-brand-purple-light transition-colors group">
-          <span className="font-display font-semibold text-base">Global Insurance Co.</span>
+          <span className="type-body font-semibold text-white">Global Insurance Co.</span>
           <NavArrowDown className="w-5 h-5 text-brand-purple-secondary group-hover:text-brand-purple-light transition-colors" />
         </button>
 
         {/* Session Info */}
-        <span className="text-brand-purple-secondary text-xs font-body hidden md:block">
+        <span className="text-brand-purple-secondary type-caption hidden md:block">
           Session started 9:14 AM
         </span>
       </div>
