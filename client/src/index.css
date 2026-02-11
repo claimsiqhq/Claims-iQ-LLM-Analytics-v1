@@ -8,23 +8,23 @@
   --font-body: 'Source Sans Pro', sans-serif;
   --font-mono: 'Space Mono', monospace;
 
-  /* Brand Colors - Converted to H S% L% for Tailwind v4 alpha/opacity support */
-  --color-brand-purple: 254 38% 56%; /* #7763B7 */
-  --color-brand-purple-secondary: 261 31% 65%; /* #9D8BBF */
-  --color-brand-purple-light: 255 77% 86%; /* #CDBFF7 */
-  --color-brand-gold: 43 51% 54%; /* #C6A54E */
-  --color-brand-gold-light: 43 60% 77%; /* #EAD4A2 */
-  --color-brand-deep-purple: 256 31% 24%; /* #342A4F */
+  /* Brand Colors - Defined as valid CSS colors */
+  --color-brand-purple: #7763B7;
+  --color-brand-purple-secondary: #9D8BBF;
+  --color-brand-purple-light: #CDBFF7;
+  --color-brand-gold: #C6A54E;
+  --color-brand-gold-light: #EAD4A2;
+  --color-brand-deep-purple: #342A4F;
   
   /* Surfaces */
-  --color-surface-purple-light: 270 67% 94%; /* #F0E6FA */
-  --color-surface-grey-lavender: 267 17% 89%; /* #E3DFE8 */
-  --color-surface-off-white: 266 23% 95%; /* #F0EDF4 */
-  --color-surface-white: 0 0% 100%; /* #FFFFFF */
+  --color-surface-purple-light: #F0E6FA;
+  --color-surface-grey-lavender: #E3DFE8;
+  --color-surface-off-white: #F0EDF4;
+  --color-surface-white: #FFFFFF;
   
   /* Utility */
-  --color-status-alert: 0 64% 58%; /* #D94F4F */
-  --color-text-secondary: 259 13% 44%; /* #6B6280 */
+  --color-status-alert: #D94F4F;
+  --color-text-secondary: #6B6280;
 
   /* Semantic Mappings */
   --color-background: var(--color-surface-off-white);
@@ -51,7 +51,7 @@
     @apply border-border;
   }
   body {
-    @apply font-body antialiased bg-background text-foreground selection:bg-brand-purple-light selection:text-brand-deep-purple text-[16px]; /* Body 16pt */
+    @apply font-body antialiased bg-background text-foreground selection:bg-brand-purple-light selection:text-brand-deep-purple text-[16px];
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
@@ -99,9 +99,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--color-surface-grey-lavender));
+  background: var(--color-surface-grey-lavender);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--color-brand-purple-secondary));
+  background: var(--color-brand-purple-secondary);
 }
