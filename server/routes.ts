@@ -8,6 +8,9 @@ import { ingestionRouter } from "./routes/ingestion";
 import { kpisRouter } from "./routes/kpis";
 import { sharesRouter } from "./routes/shares";
 import { annotationsRouter } from "./routes/annotations";
+import { scheduledReportsRouter } from "./routes/scheduled-reports";
+import { dashboardsRouter } from "./routes/dashboards";
+import { apiKeysRouter } from "./routes/api-keys";
 import { getMetrics } from "./engine/metricRegistry";
 import { parseIntent } from "./llm/intentParser";
 import { validateIntent } from "./engine/validator";
@@ -47,6 +50,9 @@ export async function registerRoutes(
   app.use(kpisRouter);
   app.use(sharesRouter);
   app.use(annotationsRouter);
+  app.use(scheduledReportsRouter);
+  app.use(dashboardsRouter);
+  app.use(apiKeysRouter);
 
   app.get("/api/health", async (_req, res) => {
     try {
