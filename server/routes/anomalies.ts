@@ -5,8 +5,7 @@ import { executeMetricQuery } from "../engine/queryCompiler";
 import { getMetricBySlug } from "../engine/metricRegistry";
 import { getMetrics } from "../engine/metricRegistry";
 import type { ParsedIntent } from "../llm/intentParser";
-
-const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+import { getDefaultClientId } from "../config/defaults";
 
 function mapConditionToSchema(condition: string): string {
   if (condition === "exceeds") return "gt";

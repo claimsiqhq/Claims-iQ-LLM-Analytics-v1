@@ -362,7 +362,7 @@ interface CanvasProps {
 
 const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table", "heatmap", "waterfall"] as const;
 
-export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "00000000-0000-0000-0000-000000000001", onFollowUpClick }: CanvasProps) => {
+export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "", onFollowUpClick }: CanvasProps) => {
   const [drillDownOpen, setDrillDownOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState("");
   const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});

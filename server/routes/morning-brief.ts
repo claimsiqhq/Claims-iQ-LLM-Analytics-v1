@@ -1,8 +1,7 @@
 import { Router, Request, Response } from "express";
 import { morningBriefGenerator } from "../engine/morningBrief";
 import { supabase } from "../config/supabase";
-
-const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+import { getDefaultClientId, getDefaultUserId } from "../config/defaults";
 
 export const morningBriefRouter = Router();
 

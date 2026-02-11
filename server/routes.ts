@@ -35,9 +35,7 @@ import {
 import { queryCache } from "./engine/queryCache";
 import { log } from "./index";
 import { runSeed } from "./seed";
-
-const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
-const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+import { getDefaultClientId, getDefaultUserId } from "./config/defaults";
 
 export async function registerRoutes(
   httpServer: Server,

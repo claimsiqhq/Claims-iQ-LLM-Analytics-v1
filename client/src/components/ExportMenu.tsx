@@ -1,7 +1,6 @@
 import React from "react";
 import { Download, Copy } from "iconoir-react";
-import { Image } from "lucide-react";
-import html2canvas from "html2canvas";
+import { ImageIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +44,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       return;
     }
     try {
+      const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(chartContainerRef.current, {
         backgroundColor: "#ffffff",
         scale: 2,
@@ -167,7 +167,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onSelect={handleExportPNG} className="cursor-pointer flex items-center gap-2" data-testid="button-export-png">
-          <Image width={16} height={16} />
+          <ImageIcon width={16} height={16} />
           Export as PNG
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={handleExportCSV} className="cursor-pointer" data-testid="button-export-csv">

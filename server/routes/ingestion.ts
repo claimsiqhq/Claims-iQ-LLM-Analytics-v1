@@ -3,8 +3,7 @@ import multer from "multer";
 import { supabase } from "../config/supabase";
 import { parsePDF } from "../ingestion/pdfParser";
 import { extractClaims } from "../ingestion/claimExtractor";
-
-const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+import { getDefaultClientId } from "../config/defaults";
 
 const upload = multer({
   storage: multer.memoryStorage(),

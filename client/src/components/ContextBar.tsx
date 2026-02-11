@@ -24,7 +24,11 @@ export const ContextBar = ({ clientId, onClientChange }: ContextBarProps) => {
     getClients()
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
-        setClients(list.map((c: any) => ({ id: c.id, name: c.name || c.slug || c.id })));
+        const mapped = list.map((c: any) => ({ id: c.id, name: c.name || c.slug || c.id }));
+        setClients(mapped);
+        if ((!clientId || !mapped.find((c) => c.id === clientId)) && mapped.length > 0) {
+          onClientChange(mapped[0].id);
+        }
       })
       .catch(console.error);
   }, []);

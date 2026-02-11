@@ -11,7 +11,7 @@ export async function askQuestion(
     body: JSON.stringify({
       message,
       thread_id: threadId,
-      client_id: clientId || "00000000-0000-0000-0000-000000000001",
+      client_id: clientId,
     }),
   });
   if (!res.ok) {
@@ -22,8 +22,7 @@ export async function askQuestion(
 }
 
 export async function getThreads(clientId?: string): Promise<any> {
-  const cid = clientId || "00000000-0000-0000-0000-000000000001";
-  const res = await fetch(`${API_BASE}/threads?client_id=${cid}`);
+  const res = await fetch(`${API_BASE}/threads?client_id=${clientId || ""}`);
   if (!res.ok) throw new Error("Failed to load threads");
   return res.json();
 }
@@ -66,9 +65,8 @@ export async function getDrilldown(
   pageSize = 25,
   clientId?: string
 ): Promise<any> {
-  const cid = clientId || "00000000-0000-0000-0000-000000000001";
   const params = new URLSearchParams({
-    client_id: cid,
+    client_id: clientId || "",
     page: String(page),
     page_size: String(pageSize),
     filters: JSON.stringify(filters),

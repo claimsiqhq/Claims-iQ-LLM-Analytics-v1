@@ -37,13 +37,11 @@ export interface ChartResponse {
   };
 }
 
-const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
-
 function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [currentResponse, setCurrentResponse] = useState<ChartResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string>(DEFAULT_CLIENT_ID);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [questionToSubmit, setQuestionToSubmit] = useState<string | null>(null);

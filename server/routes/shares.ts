@@ -2,8 +2,7 @@ import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import { supabase } from "../config/supabase";
 import { storage } from "../storage";
-
-const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { getDefaultUserId } from "../config/defaults";
 
 export const sharesRouter = Router();
 
