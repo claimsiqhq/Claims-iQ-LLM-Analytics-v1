@@ -310,7 +310,10 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     earlier: ThreadData[];
   }>({ pinned: [], today: [], this_week: [], earlier: [] });
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [annotations, setAnnotations] = useState<Array<{ id: string; turnId: string | null; note: string; createdAt: string }>>([]);
+  const [sharing, setSharing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const loadThreads = useCallback(async () => {
     try {
@@ -324,6 +327,15 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   useEffect(() => {
     loadThreads();
   }, [loadThreads]);
+
+  const loadAnnotations = useCallback(async (threadId: string) => {
+    try {
+      const data = await getAnnotations(threadId);
+      setAnnotations(data);
+    } catch {
+      setAnnotations([]);
+    }
+  }, []);
 
   const loadThreadHistory = useCallback(async (threadId: string) => {
     try {
@@ -351,6 +363,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
           }
         }
         setChatMessages(msgs);
+        loadAnnotations(threadId);
         if (latestChartTurn) {
           onNewResponse({
             thread_id: threadId,
@@ -376,7 +389,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     } catch (err) {
       console.error('Failed to load thread:', err);
     }
-  }, [onNewResponse]);
+  }, [onNewResponse, loadAnnotations]);
 
   const handleThreadClick = (id: string) => {
     setCurrentThreadId(id);
@@ -390,7 +403,22 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     onThreadSelect(null);
     setChatMessages([]);
     setCurrentThreadId(null);
+    setAnnotations([]);
     loadThreads();
+  };
+
+  const handleShare = async () => {
+    if (!currentThreadId) return;
+    setSharing(true);
+    try {
+      const { shareUrl } = await shareThread(currentThreadId);
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied to clipboard", description: "Share link expires in 7 days." });
+    } catch (e: any) {
+      toast({ title: "Failed to share", description: e.message, variant: "destructive" });
+    } finally {
+      setSharing(false);
+    }
   };
 
   const handleSend = async (messageOverride?: string) => {
@@ -512,9 +540,19 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
                 Online
               </p>
             </div>
-            <button className="p-2 hover:bg-white/50 rounded-lg text-text-secondary">
-              <MoreHoriz className="w-5 h-5" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 hover:bg-white/50 rounded-lg text-text-secondary">
+                  <MoreHoriz className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleShare} disabled={!currentThreadId || sharing}>
+                  <Share className="w-4 h-4 mr-2" />
+                  {sharing ? "Sharing..." : "Share conversation"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
@@ -590,7 +628,15 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
                 <p className="text-sm text-text-secondary">Ask a question about your claims data</p>
               </div>
             ) : (
-              chatMessages.map(m => <ChatMessage key={m.id} message={m} />)
+              chatMessages.map(m => (
+                <ChatMessage
+                  key={m.id}
+                  message={m}
+                  threadId={currentThreadId}
+                  annotations={annotations}
+                  onAnnotationsChange={() => loadAnnotations(currentThreadId!)}
+                />
+              ))
             )}
             {isLoading && (
               <div className="flex justify-start mb-6">
@@ -640,7 +686,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
           />
           <button
             data-testid="button-send"
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={isLoading || inputValue.trim().length === 0}
             className={cn(
               "absolute right-2 bottom-2.5 p-1.5 rounded-full transition-all duration-200",

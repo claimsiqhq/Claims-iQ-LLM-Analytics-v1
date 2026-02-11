@@ -1,5 +1,6 @@
 import React from "react";
-import { Download, Copy, Image } from "iconoir-react";
+import { Download, Copy } from "iconoir-react";
+import { Image } from "lucide-react";
 import html2canvas from "html2canvas";
 import {
   DropdownMenu,

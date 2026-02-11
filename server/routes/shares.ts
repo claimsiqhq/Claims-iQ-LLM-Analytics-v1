@@ -9,7 +9,10 @@ export const sharesRouter = Router();
 
 sharesRouter.post("/api/threads/:id/share", async (req: Request, res: Response) => {
   try {
-    const threadId = req.params.id;
+    const threadId = String(req.params.id || "").split(",")[0];
+    if (!threadId) {
+      return res.status(400).json({ error: "Thread ID required" });
+    }
     const userId = (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
 
     const thread = await storage.getThread(threadId);

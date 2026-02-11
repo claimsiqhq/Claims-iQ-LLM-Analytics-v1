@@ -443,9 +443,3 @@ export async function registerRoutes(
 
   return httpServer;
 }
-down data" });
-    }
-  });
-
-  return httpServer;
-}
