@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { FilterList, Download, Refresh } from 'iconoir-react';
 import { Info, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import emptyStateImg from "@/assets/empty-state.png";
 import type { ChartResponse } from "@/App";
 import { DrillDownPanel } from "@/components/DrillDownPanel";
@@ -344,7 +345,35 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
         {currentResponse.insight && (
           <div className="bg-white border-l-4 border-brand-purple p-6 rounded-r-xl shadow-sm animate-in slide-in-from-bottom-4 duration-500" data-testid="insight-summary">
             <h2 className="type-h2 text-brand-deep-purple mb-2">Insight Summary</h2>
-            <p className="type-body text-brand-deep-purple">{currentResponse.insight}</p>
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => (
+                    <p className="type-body text-brand-deep-purple leading-relaxed mb-2 last:mb-0">{children}</p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-brand-deep-purple">{children}</strong>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="text-sm text-brand-deep-purple space-y-1 mb-2 ml-1">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="text-sm text-brand-deep-purple space-y-1 mb-2 ml-1 list-decimal list-inside">{children}</ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="flex items-start gap-2 text-sm leading-relaxed">
+                      <span className="text-brand-gold mt-0.5 shrink-0">●</span>
+                      <span>{children}</span>
+                    </li>
+                  ),
+                  em: ({ children }) => (
+                    <em className="text-gray-500 not-italic text-xs">{children}</em>
+                  ),
+                }}
+              >
+                {currentResponse.insight}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
 

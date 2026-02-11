@@ -10,6 +10,7 @@ import {
   MoreHoriz
 } from 'iconoir-react';
 import { PieChart as PieChartIcon, BarChart3 as BarChartIcon, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { cn } from "@/lib/utils";
 import { askQuestion, getThreads, getThread } from "@/lib/api";
 import type { ChartResponse } from "@/App";
@@ -121,13 +122,34 @@ const ChatMessage = ({ message }: { message: MessageData }) => {
             <BarChartIcon className="w-6 h-6 text-brand-purple" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-brand-deep-purple text-sm font-body leading-snug mb-1">
-              {message.content}
-            </p>
+            <div className="text-brand-deep-purple text-sm font-body leading-snug mb-1">
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="mb-1 last:mb-0 leading-snug">{children}</p>,
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  ul: ({ children }) => <ul className="space-y-0.5 mb-1 ml-1">{children}</ul>,
+                  li: ({ children }) => (
+                    <li className="flex items-start gap-1.5 text-sm">
+                      <span className="text-brand-gold mt-0.5 shrink-0 text-[8px]">●</span>
+                      <span>{children}</span>
+                    </li>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
             {message.insight && (
-              <p className="text-xs text-text-secondary border-t border-surface-grey-lavender pt-2 mt-2 font-medium">
-                Insight: {message.insight}
-              </p>
+              <div className="text-xs text-text-secondary border-t border-surface-grey-lavender pt-2 mt-2 font-medium">
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-0.5 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  }}
+                >
+                  {`Insight: ${message.insight}`}
+                </ReactMarkdown>
+              </div>
             )}
           </div>
         </div>

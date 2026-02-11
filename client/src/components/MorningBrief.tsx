@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { NavArrowDown, NavArrowUp, X, Refresh } from "iconoir-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import ReactMarkdown from "react-markdown";
 
 interface BriefMetric {
   label: string;
@@ -57,7 +58,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
 
   if (isDismissed || !briefData) return null;
 
-  const contentPreview = briefData.content.split("\n").slice(0, 2).join("\n");
+  const contentPreview = briefData.content.split("\n").slice(0, 3).join("\n");
 
   const getTrendColor = (trend?: string): string => {
     switch (trend) {
@@ -80,7 +81,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
       <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-lg font-semibold text-gray-900">Morning Brief</h3>
+            <h3 className="text-lg font-semibold text-gray-900" data-testid="text-morning-brief-title">Morning Brief</h3>
             {briefData.anomalies > 0 && (
               <Badge className="bg-brand-gold text-brand-deep-purple">
                 {briefData.anomalies} anomalies
@@ -102,6 +103,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
             disabled={loading}
             className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label="Refresh brief"
+            data-testid="button-refresh-brief"
           >
             <Refresh width={18} height={18} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -109,6 +111,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
             onClick={() => setIsDismissed(true)}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
             aria-label="Dismiss brief"
+            data-testid="button-dismiss-brief"
           >
             <X width={18} height={18} className="text-gray-600" />
           </button>
@@ -116,16 +119,55 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
       </div>
 
       <div className="px-6 py-4">
-        <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? "max-h-[2000px]" : "max-h-12"}`}>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {isExpanded ? briefData.content : contentPreview}
-          </p>
+        <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? "max-h-[2000px]" : "max-h-24"}`}>
+          <div className="brief-content prose prose-sm max-w-none text-gray-700">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h3 className="text-base font-bold text-brand-deep-purple mt-4 mb-2 first:mt-0 font-display">{children}</h3>
+                ),
+                h2: ({ children }) => (
+                  <h4 className="text-sm font-bold text-brand-deep-purple mt-4 mb-1.5 first:mt-0 font-display">{children}</h4>
+                ),
+                h3: ({ children }) => (
+                  <h5 className="text-sm font-semibold text-gray-800 mt-3 mb-1 first:mt-0 font-display">{children}</h5>
+                ),
+                p: ({ children }) => (
+                  <p className="text-sm text-gray-700 leading-relaxed mb-3 last:mb-0">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-brand-deep-purple">{children}</strong>
+                ),
+                ul: ({ children }) => (
+                  <ul className="text-sm text-gray-700 space-y-1.5 mb-3 ml-1">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="text-sm text-gray-700 space-y-1.5 mb-3 ml-1 list-decimal list-inside">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="flex items-start gap-2 text-sm leading-relaxed">
+                    <span className="text-brand-gold mt-1 shrink-0">●</span>
+                    <span>{children}</span>
+                  </li>
+                ),
+                em: ({ children }) => (
+                  <em className="text-gray-500 not-italic text-xs">{children}</em>
+                ),
+                hr: () => (
+                  <hr className="my-3 border-gray-200" />
+                ),
+              }}
+            >
+              {isExpanded ? briefData.content : contentPreview}
+            </ReactMarkdown>
+          </div>
         </div>
 
-        {briefData.content.split("\n").length > 2 && (
+        {briefData.content.split("\n").length > 3 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="mt-3 text-sm font-medium text-brand-purple hover:text-brand-deep-purple transition-colors flex items-center gap-1"
+            data-testid="button-toggle-brief"
           >
             {isExpanded ? <>Show less <NavArrowUp width={16} height={16} /></> : <>Show more <NavArrowDown width={16} height={16} /></>}
           </button>
@@ -137,10 +179,10 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Key Metrics</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {briefData.metrics.map((metric, idx) => (
-              <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200">
+              <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200" data-testid={`card-metric-${idx}`}>
                 <p className="text-xs text-text-secondary font-medium">{metric.label}</p>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <p className="text-lg font-bold text-gray-900">{metric.value}</p>
+                  <p className="text-lg font-bold text-gray-900 font-mono">{metric.value}</p>
                   {metric.unit && <p className="text-xs text-gray-500">{metric.unit}</p>}
                 </div>
                 {metric.trend && (
