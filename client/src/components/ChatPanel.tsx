@@ -142,9 +142,10 @@ interface ChatPanelProps {
   onNewResponse: (response: ChartResponse) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  clientId?: string;
 }
 
-export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading }: ChatPanelProps) => {
+export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId }: ChatPanelProps) => {
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages] = useState<MessageData[]>([]);
@@ -159,12 +160,12 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
 
   const loadThreads = useCallback(async () => {
     try {
-      const data = await getThreads();
+      const data = await getThreads(clientId);
       setThreads(data);
     } catch (err) {
       console.log('No threads yet');
     }
-  }, []);
+  }, [clientId]);
 
   useEffect(() => {
     loadThreads();
@@ -231,7 +232,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     setChatMessages((prev) => [...prev, userMsg]);
 
     try {
-      const response = await askQuestion(msg, currentThreadId);
+      const response = await askQuestion(msg, currentThreadId, clientId);
 
       if (response.thread_id && !currentThreadId) {
         setCurrentThreadId(response.thread_id);

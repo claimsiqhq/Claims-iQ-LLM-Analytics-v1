@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -20,6 +20,9 @@ import { FilterList, Download, Refresh } from 'iconoir-react';
 import { Info, Loader2 } from 'lucide-react';
 import emptyStateImg from "@/assets/empty-state.png";
 import type { ChartResponse } from "@/App";
+import { DrillDownPanel } from "@/components/DrillDownPanel";
+import { DataTable } from "@/components/DataTable";
+import { ExportMenu } from "@/components/ExportMenu";
 
 const CHART_COLORS = [
   '#7763B7', '#C6A54E', '#9D8BBF', '#E8C97A', '#5A4A8A',
@@ -28,9 +31,11 @@ const CHART_COLORS = [
 
 interface DynamicChartProps {
   response: ChartResponse;
+  onChartClick?: (data: any) => void;
+  currentMetric?: string;
 }
 
-const DynamicChart = ({ response }: DynamicChartProps) => {
+const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartProps) => {
   if (!response.chart?.data) return null;
 
   const { type, data, title } = response.chart;
@@ -91,6 +96,32 @@ const DynamicChart = ({ response }: DynamicChartProps) => {
     labelStyle: { color: '#9D8BBF', marginBottom: '4px', fontFamily: 'Source Sans Pro', fontWeight: 600 },
   };
 
+  if (type === 'table') {
+    return (
+      <DataTable
+        data={{
+          labels,
+          datasets: datasets.map((ds) => ({
+            label: ds.label,
+            values: ds.values,
+            unit: ds.unit,
+          })),
+        }}
+      />
+    );
+  }
+
+  const handleChartClick = (data: any) => {
+    if (onChartClick && data?.activePayload?.[0]) {
+      const point = data.activePayload[0];
+      onChartClick({
+        metric: currentMetric || response.chart?.title,
+        label: point.payload?.name,
+        filters: { label: point.payload?.name },
+      });
+    }
+  };
+
   if (type === 'pie') {
     return (
       <ResponsiveContainer width="100%" height={350}>
@@ -104,6 +135,7 @@ const DynamicChart = ({ response }: DynamicChartProps) => {
             outerRadius={120}
             dataKey="value0"
             animationDuration={1500}
+            onClick={handleChartClick}
           >
             {chartData.map((_, idx) => (
               <Cell key={`cell-${idx}`} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
@@ -115,10 +147,39 @@ const DynamicChart = ({ response }: DynamicChartProps) => {
     );
   }
 
+  if (type === 'stacked_bar') {
+    return (
+      <ResponsiveContainer width="100%" height={350}>
+        <BarChart data={chartData} onClick={handleChartClick}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
+          <XAxis {...xAxisProps} />
+          <YAxis {...yAxisProps} />
+          <Tooltip {...tooltipProps} />
+          <Legend
+            wrapperStyle={{ paddingTop: '20px' }}
+            iconType="circle"
+            formatter={(value) => <span style={{ color: '#342A4F', fontSize: '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
+          />
+          {datasets.map((ds, idx) => (
+            <Bar
+              key={idx}
+              dataKey={`value${idx}`}
+              name={ds.label}
+              stackId="stack"
+              fill={CHART_COLORS[idx % CHART_COLORS.length]}
+              radius={[4, 4, 0, 0]}
+              animationDuration={1500}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
   if (type === 'line') {
     return (
       <ResponsiveContainer width="100%" height={350}>
-        <LineChart data={chartData}>
+        <LineChart data={chartData} onClick={handleChartClick}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
@@ -148,7 +209,7 @@ const DynamicChart = ({ response }: DynamicChartProps) => {
   if (type === 'area') {
     return (
       <ResponsiveContainer width="100%" height={350}>
-        <AreaChart data={chartData}>
+        <AreaChart data={chartData} onClick={handleChartClick}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
@@ -177,7 +238,7 @@ const DynamicChart = ({ response }: DynamicChartProps) => {
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={chartData} barGap={4}>
+      <BarChart data={chartData} barGap={4} onClick={handleChartClick}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
         <XAxis {...xAxisProps} />
         <YAxis {...yAxisProps} />
@@ -207,9 +268,21 @@ interface CanvasProps {
   activeThreadId: string | null;
   currentResponse: ChartResponse | null;
   isLoading: boolean;
+  clientId?: string;
 }
 
-export const Canvas = ({ activeThreadId, currentResponse, isLoading }: CanvasProps) => {
+export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "00000000-0000-0000-0000-000000000001" }: CanvasProps) => {
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [drillDownMetric, setDrillDownMetric] = useState("");
+  const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});
+
+  const handleChartClick = (data: any) => {
+    if (data?.metric) {
+      setDrillDownMetric(data.metric);
+      setDrillDownFilters(data.filters || {});
+      setDrillDownOpen(true);
+    }
+  };
   if (isLoading && !currentResponse) {
     return (
       <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center">
@@ -292,19 +365,24 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading }: CanvasPro
                 <button className="p-2 hover:bg-surface-purple-light rounded-lg text-text-secondary hover:text-brand-purple transition-colors">
                   <FilterList className="w-5 h-5" />
                 </button>
-                <button className="p-2 hover:bg-surface-purple-light rounded-lg text-text-secondary hover:text-brand-purple transition-colors">
-                  <Download className="w-5 h-5" />
-                </button>
+                <ExportMenu
+                  chartData={currentResponse.chart.data}
+                  chartTitle={currentResponse.chart.title || "Chart"}
+                />
               </div>
             </div>
 
-            <div className="h-[350px] w-full">
+            <div className="h-[350px] w-full min-h-[350px]">
               {isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="w-8 h-8 text-brand-purple animate-spin" />
                 </div>
               ) : (
-                <DynamicChart response={currentResponse} />
+                <DynamicChart
+                  response={currentResponse}
+                  onChartClick={handleChartClick}
+                  currentMetric={currentResponse.chart?.title}
+                />
               )}
             </div>
 
@@ -342,6 +420,14 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading }: CanvasPro
           </div>
         )}
       </div>
+
+      <DrillDownPanel
+        isOpen={drillDownOpen}
+        onClose={() => setDrillDownOpen(false)}
+        metric={drillDownMetric}
+        filters={drillDownFilters}
+        clientId={clientId}
+      />
     </div>
   );
 };

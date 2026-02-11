@@ -1,6 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { anomaliesRouter } from "./routes/anomalies";
+import { morningBriefRouter } from "./routes/morning-brief";
+import { exportRouter } from "./routes/export";
+import { ingestionRouter } from "./routes/ingestion";
 import { getMetrics } from "./engine/metricRegistry";
 import { parseIntent } from "./llm/intentParser";
 import { validateIntent } from "./engine/validator";
@@ -21,6 +25,11 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use(anomaliesRouter);
+  app.use(morningBriefRouter);
+  app.use(exportRouter);
+  app.use(ingestionRouter);
+
   app.get("/api/health", async (_req, res) => {
     try {
       const { supabase } = await import("./config/supabase");

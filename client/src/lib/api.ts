@@ -91,3 +91,58 @@ export async function checkHealth(): Promise<any> {
   const res = await fetch(`${API_BASE}/health`);
   return res.json();
 }
+
+// Morning Brief
+export async function getMorningBrief(clientId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/morning-brief?client_id=${clientId}`);
+  if (!res.ok) throw new Error("Failed to fetch morning brief");
+  const json = await res.json();
+  return json.data;
+}
+
+// Anomalies
+export async function getAnomalies(clientId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/anomalies?client_id=${clientId}`);
+  if (!res.ok) throw new Error("Failed to fetch anomalies");
+  const json = await res.json();
+  return json.data;
+}
+
+// Alert Rules
+export async function getAlertRules(clientId: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/alert-rules?client_id=${clientId}`);
+  if (!res.ok) throw new Error("Failed to fetch alert rules");
+  const json = await res.json();
+  return json.data || [];
+}
+
+// Export
+export async function exportCSV(
+  metric: string,
+  clientId: string,
+  startDate: string,
+  endDate: string
+): Promise<Blob> {
+  const params = new URLSearchParams({
+    metric,
+    client_id: clientId,
+    start_date: startDate,
+    end_date: endDate,
+  });
+  const res = await fetch(`${API_BASE}/export/csv?${params}`);
+  if (!res.ok) throw new Error("Failed to export CSV");
+  return res.blob();
+}
+
+// Ingestion
+export async function ingestPDF(file: File, clientId: string): Promise<any> {
+  const formData = new FormData();
+  formData.append("document", file);
+  const res = await fetch(`${API_BASE}/ingest/pdf?client_id=${clientId}`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Failed to upload PDF");
+  const json = await res.json();
+  return json.data;
+}

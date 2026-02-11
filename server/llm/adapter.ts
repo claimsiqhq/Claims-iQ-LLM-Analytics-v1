@@ -42,3 +42,6 @@ export async function llmComplete(
     latencyMs,
   };
 }
+
+/** Alias for enhancement modules that expect callLLM */
+export const callLLM = llmComplete;

@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { ContextBar } from "@/components/ContextBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Canvas } from "@/components/Canvas";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MorningBrief } from "@/components/MorningBrief";
 import { Toaster } from "@/components/ui/toaster";
 
 export interface ChartResponse {
@@ -33,10 +35,13 @@ export interface ChartResponse {
   };
 }
 
+const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+
 function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [currentResponse, setCurrentResponse] = useState<ChartResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>(DEFAULT_CLIENT_ID);
 
   const handleNewResponse = useCallback((response: ChartResponse) => {
     setCurrentResponse(response);
@@ -46,26 +51,36 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-surface-off-white font-body text-brand-deep-purple selection:bg-brand-purple-light overflow-hidden">
-      <ContextBar />
-      <div className="flex h-screen overflow-hidden">
-        <ChatPanel
-          activeThreadId={activeThreadId}
-          onThreadSelect={setActiveThreadId}
-          onNewResponse={handleNewResponse}
-          isLoading={isLoading}
-          setIsLoading={setIsLoading}
+    <ErrorBoundary>
+      <div className="min-h-screen bg-surface-off-white font-body text-brand-deep-purple selection:bg-brand-purple-light overflow-hidden">
+        <ContextBar
+          clientId={selectedClientId}
+          onClientChange={setSelectedClientId}
         />
-        <main className="flex-1 h-full overflow-y-auto w-full relative">
-          <Canvas
+        <div className="flex h-screen overflow-hidden">
+          <ChatPanel
             activeThreadId={activeThreadId}
-            currentResponse={currentResponse}
+            onThreadSelect={setActiveThreadId}
+            onNewResponse={handleNewResponse}
             isLoading={isLoading}
+            setIsLoading={setIsLoading}
+            clientId={selectedClientId}
           />
-        </main>
+          <main className="flex-1 h-full overflow-y-auto w-full relative">
+            <div className="ml-[360px] pt-14 p-6">
+              <MorningBrief clientId={selectedClientId} />
+            </div>
+            <Canvas
+              activeThreadId={activeThreadId}
+              currentResponse={currentResponse}
+              isLoading={isLoading}
+              clientId={selectedClientId}
+            />
+          </main>
+        </div>
+        <Toaster />
       </div>
-      <Toaster />
-    </div>
+    </ErrorBoundary>
   );
 }
 
