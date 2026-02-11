@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Download, Copy } from "iconoir-react";
 import {
   DropdownMenu,
@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChartDataset {
   label: string;
@@ -32,8 +32,16 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
   chartData,
   chartTitle,
 }) => {
-  const handleExportCSV = () => {
+  const { toast } = useToast();
+
+  const handleExportCSV = (e: Event) => {
+    e.preventDefault();
     try {
+      if (!chartData?.labels?.length || !chartData?.datasets?.length) {
+        toast({ title: "No data to export", variant: "destructive" });
+        return;
+      }
+
       const headers = ["Label", ...chartData.datasets.map((d) => d.label)];
       const rows = [
         headers.map((h) => `"${h}"`).join(","),
@@ -50,52 +58,89 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       ];
       const csv = rows.join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
+      link.href = url;
       link.download = `${chartTitle.replace(/\s+/g, "_")}.csv`;
-      link.style.visibility = "hidden";
+      link.style.display = "none";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-      toast.success("CSV exported successfully");
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+      toast({ title: "CSV exported successfully" });
     } catch (error) {
       console.error("CSV export error:", error);
-      toast.error("Failed to export CSV");
+      toast({ title: "Failed to export CSV", variant: "destructive" });
     }
   };
 
-  const handleExportPNG = () => {
-    toast.info("PNG export coming soon. Use screenshot for now.");
+  const handleExportJSON = (e: Event) => {
+    e.preventDefault();
+    try {
+      if (!chartData?.labels?.length) {
+        toast({ title: "No data to export", variant: "destructive" });
+        return;
+      }
+
+      const jsonStr = JSON.stringify(chartData, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${chartTitle.replace(/\s+/g, "_")}.json`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+      toast({ title: "JSON exported successfully" });
+    } catch (error) {
+      console.error("JSON export error:", error);
+      toast({ title: "Failed to export JSON", variant: "destructive" });
+    }
   };
 
-  const handleCopyData = async () => {
+  const handleCopyData = async (e: Event) => {
+    e.preventDefault();
     try {
-      await navigator.clipboard.writeText(JSON.stringify(chartData, null, 2));
-      toast.success("Data copied to clipboard");
+      const text = chartData.labels
+        .map((label, idx) => {
+          const vals = chartData.datasets
+            .map((ds) => `${ds.label}: ${ds.values[idx]}`)
+            .join(", ");
+          return `${label} — ${vals}`;
+        })
+        .join("\n");
+
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Data copied to clipboard" });
     } catch (error) {
       console.error("Copy error:", error);
-      toast.error("Failed to copy data");
+      toast({ title: "Failed to copy data", variant: "destructive" });
     }
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" title="Export chart data">
+        <Button variant="outline" size="sm" className="gap-2" data-testid="button-export">
           <Download width={16} height={16} />
           Export
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={handleExportCSV} className="cursor-pointer">
+        <DropdownMenuItem onSelect={handleExportCSV} className="cursor-pointer" data-testid="button-export-csv">
           Export as CSV
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleExportPNG} className="cursor-pointer">
-          Export as PNG
+        <DropdownMenuItem onSelect={handleExportJSON} className="cursor-pointer" data-testid="button-export-json">
+          Export as JSON
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleCopyData} className="cursor-pointer flex items-center gap-2">
+        <DropdownMenuItem onSelect={handleCopyData} className="cursor-pointer flex items-center gap-2" data-testid="button-copy-data">
           <Copy width={16} height={16} />
           Copy Data
         </DropdownMenuItem>
