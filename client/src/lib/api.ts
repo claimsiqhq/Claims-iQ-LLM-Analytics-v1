@@ -134,6 +134,57 @@ export async function exportCSV(
   return res.blob();
 }
 
+// Thread sharing
+export async function shareThread(threadId: string): Promise<{ shareUrl: string; shareToken: string; expiresAt: string }> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/share`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to share" }));
+    throw new Error(err.error || "Failed to share thread");
+  }
+  const json = await res.json();
+  return { shareUrl: json.data.shareUrl, shareToken: json.data.shareToken, expiresAt: json.data.expiresAt };
+}
+
+export async function getSharedThread(token: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/share/${token}`);
+  if (!res.ok) throw new Error("Share not found or expired");
+  const json = await res.json();
+  return json.data;
+}
+
+// Thread annotations
+export async function getAnnotations(threadId: string): Promise<Array<{ id: string; turnId: string | null; note: string; createdAt: string }>> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/annotations`);
+  if (!res.ok) throw new Error("Failed to load annotations");
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function createAnnotation(threadId: string, turnId: string | null, note: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/annotations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ turnId, note }),
+  });
+  if (!res.ok) throw new Error("Failed to add annotation");
+  return (await res.json()).data;
+}
+
+export async function updateAnnotation(threadId: string, annotationId: string, note: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/annotations/${annotationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+  if (!res.ok) throw new Error("Failed to update annotation");
+  return (await res.json()).data;
+}
+
+export async function deleteAnnotation(threadId: string, annotationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/annotations/${annotationId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete annotation");
+}
+
 // Ingestion
 export async function ingestPDF(file: File, clientId: string): Promise<any> {
   const formData = new FormData();

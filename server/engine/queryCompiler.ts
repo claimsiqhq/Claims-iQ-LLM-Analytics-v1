@@ -519,3 +519,38 @@ export function formatChartData(
     title: `${metric.display_name}${dims}${timeLabel}`,
   };
 }
+
+export function formatChartDataForComparison(
+  rawDataCurrent: any[],
+  rawDataComparison: any[],
+  intent: ParsedIntent,
+  metric: MetricDefinition,
+  comparisonLabel = "Previous Period"
+): {
+  type: string;
+  data: { labels: string[]; datasets: Array<{ label: string; values: number[]; unit: string }> };
+  title: string;
+} {
+  const avgCurrent =
+    rawDataCurrent.length > 0
+      ? rawDataCurrent.reduce((s, r) => s + parseFloat(r.value || 0), 0) / rawDataCurrent.length
+      : 0;
+  const avgComparison =
+    rawDataComparison.length > 0
+      ? rawDataComparison.reduce((s, r) => s + parseFloat(r.value || 0), 0) / rawDataComparison.length
+      : 0;
+  const unit = metric.unit || "count";
+  const chartType = intent.chart_type || metric.default_chart_type;
+  const timeLabel = intent.time_range?.value ? ` — ${intent.time_range.value.replace(/_/g, " ")}` : "";
+  return {
+    type: chartType === "line" ? "bar" : chartType,
+    data: {
+      labels: ["Current Period", comparisonLabel],
+      datasets: [
+        { label: "Current", values: [Math.round(avgCurrent * 100) / 100], unit },
+        { label: comparisonLabel, values: [Math.round(avgComparison * 100) / 100], unit },
+      ],
+    },
+    title: `${metric.display_name} vs ${comparisonLabel}${timeLabel}`,
+  };
+}

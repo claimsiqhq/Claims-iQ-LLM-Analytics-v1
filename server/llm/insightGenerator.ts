@@ -40,3 +40,34 @@ Generate a concise insight paragraph.`;
 
   return { insight: llmResponse.content.trim(), llmResponse };
 }
+
+const FOLLOW_UP_SYSTEM_PROMPT = `You are an analytics assistant for Claims IQ Analytics.
+Given the user's question and the metric/chart they just viewed, suggest 2-3 follow-up questions they might ask next.
+Output ONLY a JSON array of strings, e.g. ["Question 1?", "Question 2?", "Question 3?"].
+Keep each question under 15 words. Be specific to claims analytics (SLAs, cycle time, severity, adjusters, etc.).`;
+
+export async function generateFollowUpSuggestions(
+  userMessage: string,
+  metricName: string,
+  chartData: any
+): Promise<string[]> {
+  try {
+    const prompt = `User asked: "${userMessage}"
+Metric viewed: ${metricName}
+
+Suggest 2-3 follow-up questions (JSON array of strings only):`;
+    const response = await llmComplete(FOLLOW_UP_SYSTEM_PROMPT, prompt, {
+      maxTokens: 256,
+      temperature: 0.5,
+    });
+    const content = response.content.trim();
+    const jsonMatch = content.match(/\[[\s\S]*?\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as string[];
+      return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}

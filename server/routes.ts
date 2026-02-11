@@ -5,16 +5,31 @@ import { anomaliesRouter } from "./routes/anomalies";
 import { morningBriefRouter } from "./routes/morning-brief";
 import { exportRouter } from "./routes/export";
 import { ingestionRouter } from "./routes/ingestion";
+import { kpisRouter } from "./routes/kpis";
+import { sharesRouter } from "./routes/shares";
+import { annotationsRouter } from "./routes/annotations";
 import { getMetrics } from "./engine/metricRegistry";
 import { parseIntent } from "./llm/intentParser";
 import { validateIntent } from "./engine/validator";
-import { executeMetricQuery, formatChartData } from "./engine/queryCompiler";
-import { generateInsight } from "./llm/insightGenerator";
+import {
+  executeMetricQuery,
+  formatChartData,
+  formatChartDataForComparison,
+} from "./engine/queryCompiler";
+import {
+  getComparisonDateRange,
+  createComparisonIntent,
+} from "./engine/comparisonHelper";
+import {
+  generateInsight,
+  generateFollowUpSuggestions,
+} from "./llm/insightGenerator";
 import {
   createEmptyContext,
   mergeContext,
   type ThreadContext,
 } from "./engine/contextManager";
+import { queryCache } from "./engine/queryCache";
 import { log } from "./index";
 import { runSeed } from "./seed";
 
@@ -29,6 +44,9 @@ export async function registerRoutes(
   app.use(morningBriefRouter);
   app.use(exportRouter);
   app.use(ingestionRouter);
+  app.use(kpisRouter);
+  app.use(sharesRouter);
+  app.use(annotationsRouter);
 
   app.get("/api/health", async (_req, res) => {
     try {
@@ -154,15 +172,39 @@ export async function registerRoutes(
       let rawData: any[];
       let queryMs: number;
       let recordCount: number;
+      const cacheKey = queryCache.generateCacheKey(
+        validation.metric!.slug,
+        client_id,
+        { filters: intent.filters, dimensions: intent.dimensions },
+        intent.time_range?.value || "last_30_days",
+        { start: intent.time_range?.start, end: intent.time_range?.end }
+      );
+      const cached = await queryCache.getCachedResult(cacheKey);
+      let cacheHit = false;
+
       try {
-        const result = await executeMetricQuery(
-          intent,
-          validation.metric!,
-          client_id
-        );
-        rawData = result.data;
-        queryMs = result.queryMs;
-        recordCount = result.recordCount;
+        if (cached && Array.isArray(cached)) {
+          rawData = cached as any[];
+          queryMs = 0;
+          recordCount = rawData.length;
+          cacheHit = true;
+        } else {
+          const result = await executeMetricQuery(
+            intent,
+            validation.metric!,
+            client_id
+          );
+          rawData = result.data;
+          queryMs = result.queryMs;
+          recordCount = result.recordCount;
+          await queryCache.setCachedResult(
+            cacheKey,
+            validation.metric!.slug,
+            client_id,
+            rawData,
+            15
+          );
+        }
       } catch (queryErr: any) {
         log(`Query execution error: ${queryErr.message}`, "ask");
         const errorTurn = await storage.createTurn({
@@ -190,11 +232,37 @@ export async function registerRoutes(
         });
       }
 
-      const chartData = formatChartData(
-        rawData,
-        intent,
-        validation.metric!
-      );
+      let chartData: {
+        type: string;
+        data: { labels: string[]; datasets: Array<{ label: string; values: number[]; unit: string }> };
+        title: string;
+      };
+      if (intent.comparison?.offset) {
+        const { start: currStart, end: currEnd } = intent.time_range || {
+          start: "",
+          end: "",
+        };
+        const { start: compStart, end: compEnd } = getComparisonDateRange(
+          currStart,
+          currEnd,
+          intent.comparison.offset
+        );
+        const compIntent = createComparisonIntent(intent, compStart, compEnd);
+        const compResult = await executeMetricQuery(
+          compIntent,
+          validation.metric!,
+          client_id
+        );
+        chartData = formatChartDataForComparison(
+          rawData,
+          compResult.data as any[],
+          intent,
+          validation.metric!,
+          "Previous Period"
+        );
+      } else {
+        chartData = formatChartData(rawData, intent, validation.metric!);
+      }
 
       let insight = "";
       let insightLlmMs = 0;
@@ -210,6 +278,15 @@ export async function registerRoutes(
         insightLlmMs = insightLlm.latencyMs;
       } else {
         insight = "No data found for the specified criteria. Try adjusting your filters or time range.";
+      }
+
+      let followUpSuggestions: string[] = [];
+      if (rawData.length > 0) {
+        followUpSuggestions = await generateFollowUpSuggestions(
+          message,
+          validation.metric!.display_name,
+          chartData
+        );
       }
 
       const turn = await storage.createTurn({
@@ -240,6 +317,7 @@ export async function registerRoutes(
           title: chartData.title,
         },
         insight,
+        followUpSuggestions,
         assumptions: intent.assumptions,
         metadata: {
           metric_definition: validation.metric!.description,
@@ -249,6 +327,7 @@ export async function registerRoutes(
           record_count: recordCount,
           query_ms: queryMs,
           llm_ms: intentLlm.latencyMs + insightLlmMs,
+          cache_hit: cacheHit,
         },
       });
     } catch (err: any) {
@@ -359,6 +438,12 @@ export async function registerRoutes(
     } catch (err: any) {
       log(`Error in drilldown: ${err.message}`, "drilldown");
       res.status(500).json({ error: "Failed to load drilldown data" });
+    }
+  });
+
+  return httpServer;
+}
+down data" });
     }
   });
 

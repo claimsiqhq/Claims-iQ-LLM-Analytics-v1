@@ -4,6 +4,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { Canvas } from "@/components/Canvas";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MorningBrief } from "@/components/MorningBrief";
+import { KPICards } from "@/components/KPICards";
 import { Toaster } from "@/components/ui/toaster";
 
 export interface ChartResponse {
@@ -18,6 +19,7 @@ export interface ChartResponse {
     title: string;
   };
   insight?: string;
+  followUpSuggestions?: string[];
   assumptions?: Array<{ key: string; assumed_value?: string; value?: string; label: string; editable?: boolean }>;
   metadata?: {
     metric_definition?: string;
@@ -44,6 +46,7 @@ function App() {
   const [selectedClientId, setSelectedClientId] = useState<string>(DEFAULT_CLIENT_ID);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [questionToSubmit, setQuestionToSubmit] = useState<string | null>(null);
 
   const handleNewResponse = useCallback((response: ChartResponse) => {
     setCurrentResponse(response);
@@ -73,9 +76,12 @@ function App() {
             isLoading={isLoading}
             setIsLoading={setIsLoading}
             clientId={selectedClientId}
+            questionToSubmit={questionToSubmit}
+            onQuestionSubmitted={() => setQuestionToSubmit(null)}
           />
           <main className="flex-1 h-full overflow-y-auto w-full relative">
             <div className="ml-[360px] pt-14 p-6 space-y-6">
+              <KPICards clientId={selectedClientId} />
               {currentResponse?.chart && (
                 <div ref={chartContainerRef}>
                   <Canvas
@@ -83,6 +89,7 @@ function App() {
                     currentResponse={currentResponse}
                     isLoading={isLoading}
                     clientId={selectedClientId}
+                    onFollowUpClick={(q) => setQuestionToSubmit(q)}
                   />
                 </div>
               )}
@@ -93,6 +100,7 @@ function App() {
                   currentResponse={currentResponse}
                   isLoading={isLoading}
                   clientId={selectedClientId}
+                  onFollowUpClick={(q) => setQuestionToSubmit(q)}
                 />
               )}
             </div>

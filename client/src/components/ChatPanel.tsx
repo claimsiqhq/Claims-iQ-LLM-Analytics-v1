@@ -10,10 +10,25 @@ import {
   MoreHoriz
 } from 'iconoir-react';
 import { PieChart as PieChartIcon, BarChart3 as BarChartIcon, Loader2 } from 'lucide-react';
+import { Share, StickyNote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from "@/lib/utils";
-import { askQuestion, getThreads, getThread } from "@/lib/api";
+import { askQuestion, getThreads, getThread, shareThread, getAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } from "@/lib/api";
 import type { ChartResponse } from "@/App";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 const promptChips = [
   { label: 'SLA breach rate by adjuster' },
@@ -101,8 +116,111 @@ function formatTimeAgo(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-const ChatMessage = ({ message }: { message: MessageData }) => {
+interface AnnotationNoteProps {
+  threadId: string;
+  turnId: string | null;
+  annotation?: { id: string; note: string };
+  onSaved: () => void;
+}
+
+function AnnotationNote({ threadId, turnId, annotation, onSaved }: AnnotationNoteProps) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState(annotation?.note ?? "");
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => { setNote(annotation?.note ?? ""); }, [annotation?.note]);
+
+  const handleSave = async () => {
+    const trimmed = note.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      if (annotation) {
+        await updateAnnotation(threadId, annotation.id, trimmed);
+        toast({ title: "Annotation updated" });
+      } else {
+        await createAnnotation(threadId, turnId, trimmed);
+        toast({ title: "Annotation added" });
+      }
+      setOpen(false);
+      onSaved();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!annotation) return;
+    setSaving(true);
+    try {
+      await deleteAnnotation(threadId, annotation.id);
+      setNote("");
+      setOpen(false);
+      onSaved();
+      toast({ title: "Annotation removed" });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "p-1.5 rounded-md transition-colors",
+            annotation ? "text-brand-gold hover:bg-brand-gold-light/30" : "text-text-secondary hover:bg-surface-grey-lavender/50 opacity-0 group-hover:opacity-100"
+          )}
+          title={annotation ? "View/edit note" : "Add note"}
+        >
+          <StickyNote className="w-4 h-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">{annotation ? "Edit note" : "Add note"}</h4>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Add a note to this response..."
+            rows={3}
+            className="text-sm"
+          />
+          <div className="flex gap-2 justify-end">
+            {annotation && (
+              <Button variant="outline" size="sm" onClick={handleDelete} disabled={saving}>
+                Delete
+              </Button>
+            )}
+            <Button size="sm" onClick={handleSave} disabled={!note.trim() || saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const ChatMessage = ({
+  message,
+  threadId,
+  annotations,
+  onAnnotationsChange,
+}: {
+  message: MessageData;
+  threadId: string | null;
+  annotations: Array<{ id: string; turnId: string | null; note: string; createdAt: string }>;
+  onAnnotationsChange: () => void;
+}) => {
   const isUser = message.role === 'user';
+  const turnId = !isUser && message.id.startsWith('s-') ? message.id.replace(/^s-/, '') : null;
+  const annotation = turnId ? annotations.find(a => a.turnId === turnId) : undefined;
 
   if (isUser) {
     return (
@@ -122,35 +240,47 @@ const ChatMessage = ({ message }: { message: MessageData }) => {
             <BarChartIcon className="w-6 h-6 text-brand-purple" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-brand-deep-purple text-sm font-body leading-snug mb-1">
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <p className="mb-1 last:mb-0 leading-snug">{children}</p>,
-                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  ul: ({ children }) => <ul className="space-y-0.5 mb-1 ml-1">{children}</ul>,
-                  li: ({ children }) => (
-                    <li className="flex items-start gap-1.5 text-sm">
-                      <span className="text-brand-gold mt-0.5 shrink-0 text-[8px]">●</span>
-                      <span>{children}</span>
-                    </li>
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-            {message.insight && (
-              <div className="text-xs text-text-secondary border-t border-surface-grey-lavender pt-2 mt-2 font-medium">
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p className="mb-0.5 last:mb-0">{children}</p>,
-                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  }}
-                >
-                  {`Insight: ${message.insight}`}
-                </ReactMarkdown>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-brand-deep-purple text-sm font-body leading-snug mb-1">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-1 last:mb-0 leading-snug">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      ul: ({ children }) => <ul className="space-y-0.5 mb-1 ml-1">{children}</ul>,
+                      li: ({ children }) => (
+                        <li className="flex items-start gap-1.5 text-sm">
+                          <span className="text-brand-gold mt-0.5 shrink-0 text-[8px]">●</span>
+                          <span>{children}</span>
+                        </li>
+                      ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+                {message.insight && (
+                  <div className="text-xs text-text-secondary border-t border-surface-grey-lavender pt-2 mt-2 font-medium">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-0.5 last:mb-0">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      }}
+                    >
+                      {`Insight: ${message.insight}`}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
-            )}
+              {threadId && turnId && (
+                <AnnotationNote
+                  threadId={threadId}
+                  turnId={turnId}
+                  annotation={annotation}
+                  onSaved={onAnnotationsChange}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -165,9 +295,11 @@ interface ChatPanelProps {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   clientId?: string;
+  questionToSubmit?: string | null;
+  onQuestionSubmitted?: () => void;
 }
 
-export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId }: ChatPanelProps) => {
+export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId, questionToSubmit, onQuestionSubmitted }: ChatPanelProps) => {
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages] = useState<MessageData[]>([]);
@@ -261,11 +393,11 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     loadThreads();
   };
 
-  const handleSend = async () => {
-    const msg = inputValue.trim();
+  const handleSend = async (messageOverride?: string) => {
+    const msg = (messageOverride ?? inputValue).trim();
     if (!msg || isLoading) return;
 
-    setInputValue('');
+    if (!messageOverride) setInputValue('');
     setView('chat');
     setIsLoading(true);
 
@@ -325,6 +457,13 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  useEffect(() => {
+    if (questionToSubmit?.trim()) {
+      handleSend(questionToSubmit);
+      onQuestionSubmitted?.();
+    }
+  }, [questionToSubmit]);
 
   useEffect(() => {
     if (activeThreadId === 'new') {

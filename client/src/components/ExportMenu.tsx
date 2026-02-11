@@ -1,5 +1,6 @@
 import React from "react";
-import { Download, Copy } from "iconoir-react";
+import { Download, Copy, Image } from "iconoir-react";
+import html2canvas from "html2canvas";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ interface ChartData {
 interface ExportMenuProps {
   chartData: ChartData;
   chartTitle: string;
+  chartContainerRef?: React.RefObject<HTMLDivElement | null>;
   threadId?: string;
   turnId?: string;
 }
@@ -31,8 +33,38 @@ interface ExportMenuProps {
 export const ExportMenu: React.FC<ExportMenuProps> = ({
   chartData,
   chartTitle,
+  chartContainerRef,
 }) => {
   const { toast } = useToast();
+
+  const handleExportPNG = async (e: Event) => {
+    e.preventDefault();
+    if (!chartContainerRef?.current) {
+      toast({ title: "Chart not ready for export", variant: "destructive" });
+      return;
+    }
+    try {
+      const canvas = await html2canvas(chartContainerRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      const url = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${chartTitle.replace(/\s+/g, "_")}.png`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 100);
+      toast({ title: "PNG exported successfully" });
+    } catch (error) {
+      console.error("PNG export error:", error);
+      toast({ title: "Failed to export PNG", variant: "destructive" });
+    }
+  };
 
   const handleExportCSV = (e: Event) => {
     e.preventDefault();
@@ -133,6 +165,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onSelect={handleExportPNG} className="cursor-pointer flex items-center gap-2" data-testid="button-export-png">
+          <Image width={16} height={16} />
+          Export as PNG
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={handleExportCSV} className="cursor-pointer" data-testid="button-export-csv">
           Export as CSV
         </DropdownMenuItem>

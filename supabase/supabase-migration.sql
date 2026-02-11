@@ -312,6 +312,29 @@ CREATE INDEX IF NOT EXISTS idx_morning_briefs_client_date ON morning_briefs(clie
 CREATE INDEX IF NOT EXISTS idx_query_cache_key ON query_cache(cache_key);
 CREATE INDEX IF NOT EXISTS idx_query_cache_expires ON query_cache(expires_at);
 
+-- 13b. Thread Sharing & Annotations
+CREATE TABLE IF NOT EXISTS thread_shares (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  share_token TEXT UNIQUE NOT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS thread_annotations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  turn_id UUID REFERENCES thread_turns(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  note TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_shares_thread ON thread_shares(thread_id);
+CREATE INDEX IF NOT EXISTS idx_thread_shares_token ON thread_shares(share_token);
+CREATE INDEX IF NOT EXISTS idx_thread_annotations_thread ON thread_annotations(thread_id);
+
 -- 14. Ingestion Jobs (PDF document processing)
 CREATE TABLE IF NOT EXISTS ingestion_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

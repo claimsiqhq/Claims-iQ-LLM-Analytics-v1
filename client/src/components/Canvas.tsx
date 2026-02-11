@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -270,12 +270,21 @@ interface CanvasProps {
   currentResponse: ChartResponse | null;
   isLoading: boolean;
   clientId?: string;
+  onFollowUpClick?: (question: string) => void;
 }
 
-export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "00000000-0000-0000-0000-000000000001" }: CanvasProps) => {
+const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table"] as const;
+
+export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "00000000-0000-0000-0000-000000000001", onFollowUpClick }: CanvasProps) => {
   const [drillDownOpen, setDrillDownOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState("");
   const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});
+  const [chartTypeOverride, setChartTypeOverride] = useState<string | null>(null);
+  const chartAreaRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setChartTypeOverride(null);
+  }, [currentResponse?.turn_id]);
 
   const handleChartClick = (data: any) => {
     if (data?.metric) {
@@ -378,7 +387,7 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
         )}
 
         {currentResponse.chart && (
-          <div className="w-full min-h-[400px] bg-white rounded-xl border border-surface-grey-lavender p-6 shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500" data-testid="chart-area">
+          <div ref={chartAreaRef} className="w-full min-h-[400px] bg-white rounded-xl border border-surface-grey-lavender p-6 shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500" data-testid="chart-area">
             <div className="flex justify-between items-start mb-8">
               <div>
                 <h2 className="text-xl font-display font-semibold text-brand-deep-purple mb-1" data-testid="text-chart-title">
@@ -390,13 +399,26 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
                   </p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <select
+                  value={chartTypeOverride ?? currentResponse.chart.type}
+                  onChange={(e) => setChartTypeOverride(e.target.value)}
+                  className="text-sm border border-surface-grey-lavender rounded-lg px-3 py-1.5 bg-white text-brand-deep-purple hover:border-brand-purple-light focus:outline-none focus:ring-2 focus:ring-brand-purple-light"
+                  data-testid="chart-type-select"
+                >
+                  {CHART_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t === "stacked_bar" ? "Stacked Bar" : t.charAt(0).toUpperCase() + t.slice(1)}
+                    </option>
+                  ))}
+                </select>
                 <button className="p-2 hover:bg-surface-purple-light rounded-lg text-text-secondary hover:text-brand-purple transition-colors">
                   <FilterList className="w-5 h-5" />
                 </button>
                 <ExportMenu
                   chartData={currentResponse.chart.data}
                   chartTitle={currentResponse.chart.title || "Chart"}
+                  chartContainerRef={chartAreaRef}
                 />
               </div>
             </div>
@@ -408,7 +430,13 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
                 </div>
               ) : (
                 <DynamicChart
-                  response={currentResponse}
+                  response={{
+                    ...currentResponse,
+                    chart: {
+                      ...currentResponse.chart,
+                      type: chartTypeOverride ?? currentResponse.chart.type,
+                    },
+                  }}
                   onChartClick={handleChartClick}
                   currentMetric={currentResponse.chart?.title}
                 />
@@ -435,6 +463,20 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
           </div>
         )}
 
+        {currentResponse.followUpSuggestions && currentResponse.followUpSuggestions.length > 0 && (
+          <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 duration-300" data-testid="follow-up-suggestions">
+            <span className="text-xs text-text-secondary font-medium self-center mr-1">You might also ask:</span>
+            {currentResponse.followUpSuggestions.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onFollowUpClick?.(q)}
+                className="px-3 py-1.5 bg-white border border-brand-purple-light rounded-full text-xs text-brand-deep-purple hover:bg-surface-purple-light hover:border-brand-purple transition-colors cursor-pointer"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
         {currentResponse.assumptions && currentResponse.assumptions.length > 0 && (
           <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 duration-300" data-testid="assumptions-bar">
             <span className="text-xs text-text-secondary font-medium self-center mr-1">Assumptions:</span>
