@@ -31,7 +31,7 @@ function convertToCSV(data: Record<string, unknown>[]): string {
 exportRouter.get("/api/export/csv", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const threadId = req.query.thread_id as string | undefined;
     const turnId = req.query.turn_id as string | undefined;
 
@@ -103,7 +103,7 @@ exportRouter.get("/api/export/csv", async (req: Request, res: Response) => {
 exportRouter.get("/api/export/json", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const threadId = req.query.thread_id as string | undefined;
     const pretty = req.query.pretty === "true";
 
@@ -168,7 +168,7 @@ exportRouter.get("/api/export/json", async (req: Request, res: Response) => {
 exportRouter.get("/api/export/status", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const exportId = req.query.export_id as string;
 
     if (!exportId) {

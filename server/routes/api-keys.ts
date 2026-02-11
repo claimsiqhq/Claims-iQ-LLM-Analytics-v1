@@ -11,7 +11,7 @@ function hashKey(key: string): string {
 
 apiKeysRouter.get("/api/api-keys", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
 
     const { data, error } = await supabase
       .from("api_keys")
@@ -42,7 +42,7 @@ apiKeysRouter.get("/api/api-keys", async (req: Request, res: Response) => {
 
 apiKeysRouter.post("/api/api-keys", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const { name } = req.body;
 
     const rawKey = `claims_${crypto.randomBytes(24).toString("hex")}`;
@@ -83,7 +83,7 @@ apiKeysRouter.post("/api/api-keys", async (req: Request, res: Response) => {
 
 apiKeysRouter.delete("/api/api-keys/:id", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const id = req.params.id;
 
     const { error } = await supabase

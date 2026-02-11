@@ -83,7 +83,7 @@ ingestionRouter.post(
   async (req: Request, res: Response) => {
     try {
       const clientId =
-        (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+        (req.query.client_id as string) || await getDefaultClientId();
 
       const file = (req as any).file;
       if (!file) {
@@ -145,7 +145,7 @@ ingestionRouter.post(
 ingestionRouter.get("/api/ingest/status/:jobId", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const jobId = req.params.jobId;
 
     const { data: job, error } = await supabase
@@ -193,7 +193,7 @@ ingestionRouter.get("/api/ingest/status/:jobId", async (req: Request, res: Respo
 ingestionRouter.get("/api/ingest/jobs", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const status = req.query.status as string | undefined;
     const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "20", 10)));

@@ -7,7 +7,7 @@ export const kpisRouter = Router();
 kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const today = new Date().toISOString().split("T")[0];
     const todayStart = today + "T00:00:00";

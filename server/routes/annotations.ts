@@ -40,7 +40,7 @@ annotationsRouter.post("/api/threads/:threadId/annotations", async (req: Request
   try {
     const threadId = req.params.threadId;
     const { turnId, note } = req.body;
-    const userId = (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
+    const userId = (req.headers["x-user-id"] as string) || await getDefaultUserId();
 
     if (!note?.trim()) {
       return res.status(400).json({

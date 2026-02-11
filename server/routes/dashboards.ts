@@ -6,7 +6,7 @@ export const dashboardsRouter = Router();
 
 dashboardsRouter.get("/api/dashboards", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
 
     const { data, error } = await supabase
       .from("saved_dashboards")
@@ -37,7 +37,7 @@ dashboardsRouter.get("/api/dashboards", async (req: Request, res: Response) => {
 
 dashboardsRouter.post("/api/dashboards", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const { title, layout } = req.body;
 
     if (!title) {
@@ -80,7 +80,7 @@ dashboardsRouter.post("/api/dashboards", async (req: Request, res: Response) => 
 
 dashboardsRouter.patch("/api/dashboards/:id", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const id = req.params.id;
     const updates: Record<string, unknown> = {};
     if (req.body.title !== undefined) updates.title = req.body.title;
@@ -116,7 +116,7 @@ dashboardsRouter.patch("/api/dashboards/:id", async (req: Request, res: Response
 
 dashboardsRouter.delete("/api/dashboards/:id", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const id = req.params.id;
 
     const { error } = await supabase

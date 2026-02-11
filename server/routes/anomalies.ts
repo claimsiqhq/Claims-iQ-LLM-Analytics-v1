@@ -20,7 +20,7 @@ export const anomaliesRouter = Router();
 anomaliesRouter.get("/api/anomalies", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const metric = req.query.metric as string | undefined;
     const severity = req.query.severity as string | undefined;
@@ -86,7 +86,7 @@ anomaliesRouter.get("/api/anomalies", async (req: Request, res: Response) => {
 anomaliesRouter.get("/api/anomalies/detect", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const metricsParam = req.query.metrics as string | undefined;
     const lookbackDays = parseInt((req.query.lookback_days as string) || "30", 10) || 30;
@@ -134,7 +134,7 @@ anomaliesRouter.get("/api/anomalies/detect", async (req: Request, res: Response)
 anomaliesRouter.get("/api/alert-rules", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const activeOnly = req.query.active_only === "true";
 
     let query = supabase
@@ -185,7 +185,7 @@ anomaliesRouter.get("/api/alert-rules", async (req: Request, res: Response) => {
 anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const { name, metricSlug, condition, threshold, severity } = req.body;
 
@@ -257,7 +257,7 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
 anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const ruleId = req.params.id;
 
     const updates: Record<string, unknown> = {};
@@ -320,7 +320,7 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
 anomaliesRouter.post("/api/alert-rules/execute", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const { data: rules, error: rulesError } = await supabase
       .from("alert_rules")
@@ -401,7 +401,7 @@ anomaliesRouter.post("/api/alert-rules/execute", async (req: Request, res: Respo
 anomaliesRouter.delete("/api/alert-rules/:id", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const ruleId = req.params.id;
 
     const { error } = await supabase

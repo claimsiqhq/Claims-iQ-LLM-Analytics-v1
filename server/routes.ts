@@ -89,7 +89,7 @@ export async function registerRoutes(
 
   app.get("/api/clients", async (req, res) => {
     try {
-      const userId = (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
+      const userId = (req.headers["x-user-id"] as string) || await getDefaultUserId();
       const clients = await storage.getClients();
       res.json(clients);
     } catch (err: any) {
@@ -103,10 +103,11 @@ export async function registerRoutes(
       const {
         message,
         thread_id,
-        client_id = DEFAULT_CLIENT_ID,
+        client_id,
       } = req.body;
+      const resolvedClientId = client_id || await getDefaultClientId();
       const userId =
-        (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
+        (req.headers["x-user-id"] as string) || await getDefaultUserId();
 
       if (!message) {
         return res.status(400).json({ error: "Message is required" });
@@ -344,9 +345,9 @@ export async function registerRoutes(
   app.get("/api/threads", async (req, res) => {
     try {
       const userId =
-        (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
+        (req.headers["x-user-id"] as string) || await getDefaultUserId();
       const clientId =
-        (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+        (req.query.client_id as string) || await getDefaultClientId();
 
       const threads = await storage.getThreads(userId, clientId);
 
@@ -405,7 +406,7 @@ export async function registerRoutes(
   app.get("/api/drilldown", async (req, res) => {
     try {
       const clientId =
-        (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+        (req.query.client_id as string) || await getDefaultClientId();
       const page = parseInt((req.query.page as string) || "1", 10);
       const pageSize = parseInt(
         (req.query.page_size as string) || "25",

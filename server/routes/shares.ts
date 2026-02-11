@@ -12,7 +12,7 @@ sharesRouter.post("/api/threads/:id/share", async (req: Request, res: Response) 
     if (!threadId) {
       return res.status(400).json({ error: "Thread ID required" });
     }
-    const userId = (req.headers["x-user-id"] as string) || DEFAULT_USER_ID;
+    const userId = (req.headers["x-user-id"] as string) || await getDefaultUserId();
 
     const thread = await storage.getThread(threadId);
     if (!thread) {

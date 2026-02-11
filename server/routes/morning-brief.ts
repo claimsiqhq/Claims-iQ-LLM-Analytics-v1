@@ -8,8 +8,8 @@ export const morningBriefRouter = Router();
 morningBriefRouter.get("/api/morning-brief", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
-    const userId = "00000000-0000-0000-0000-000000000001"; // Default user when no auth
+      (req.query.client_id as string) || await getDefaultClientId();
+    const userId = await getDefaultUserId();
 
     const brief = await morningBriefGenerator.generateMorningBrief(clientId, userId);
 
@@ -47,7 +47,7 @@ morningBriefRouter.get("/api/morning-brief", async (req: Request, res: Response)
 morningBriefRouter.get("/api/morning-brief/history", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
 
     const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || "10", 10)));
@@ -100,7 +100,7 @@ morningBriefRouter.get("/api/morning-brief/history", async (req: Request, res: R
 morningBriefRouter.get("/api/morning-brief/:briefDate", async (req: Request, res: Response) => {
   try {
     const clientId =
-      (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+      (req.query.client_id as string) || await getDefaultClientId();
     const briefDate = Array.isArray(req.params.briefDate) ? req.params.briefDate[0] : req.params.briefDate;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(briefDate)) {

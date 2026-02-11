@@ -6,7 +6,7 @@ export const scheduledReportsRouter = Router();
 
 scheduledReportsRouter.get("/api/scheduled-reports", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
 
     const { data, error } = await supabase
       .from("scheduled_metric_reports")
@@ -41,7 +41,7 @@ scheduledReportsRouter.get("/api/scheduled-reports", async (req: Request, res: R
 
 scheduledReportsRouter.post("/api/scheduled-reports", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const { title, metricSlug, scheduleCron, recipients } = req.body;
 
     if (!title || !metricSlug || !scheduleCron) {
@@ -89,7 +89,7 @@ scheduledReportsRouter.post("/api/scheduled-reports", async (req: Request, res: 
 
 scheduledReportsRouter.patch("/api/scheduled-reports/:id", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const id = req.params.id;
     const updates: Record<string, unknown> = {};
     if (req.body.title !== undefined) updates.title = req.body.title;
@@ -131,7 +131,7 @@ scheduledReportsRouter.patch("/api/scheduled-reports/:id", async (req: Request, 
 
 scheduledReportsRouter.delete("/api/scheduled-reports/:id", async (req: Request, res: Response) => {
   try {
-    const clientId = (req.query.client_id as string) || DEFAULT_CLIENT_ID;
+    const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const id = req.params.id;
 
     const { error } = await supabase
