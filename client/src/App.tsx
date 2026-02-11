@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ContextBar } from "@/components/ContextBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Canvas } from "@/components/Canvas";
@@ -43,12 +43,20 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>(DEFAULT_CLIENT_ID);
 
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
   const handleNewResponse = useCallback((response: ChartResponse) => {
     setCurrentResponse(response);
     if (response.thread_id) {
       setActiveThreadId(response.thread_id);
     }
   }, []);
+
+  useEffect(() => {
+    if (currentResponse?.chart && chartContainerRef.current) {
+      chartContainerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [currentResponse?.turn_id]);
 
   return (
     <ErrorBoundary>
@@ -67,15 +75,27 @@ function App() {
             clientId={selectedClientId}
           />
           <main className="flex-1 h-full overflow-y-auto w-full relative">
-            <div className="ml-[360px] pt-14 p-6">
+            <div className="ml-[360px] pt-14 p-6 space-y-6">
+              {currentResponse?.chart && (
+                <div ref={chartContainerRef}>
+                  <Canvas
+                    activeThreadId={activeThreadId}
+                    currentResponse={currentResponse}
+                    isLoading={isLoading}
+                    clientId={selectedClientId}
+                  />
+                </div>
+              )}
               <MorningBrief clientId={selectedClientId} />
+              {!currentResponse?.chart && (
+                <Canvas
+                  activeThreadId={activeThreadId}
+                  currentResponse={currentResponse}
+                  isLoading={isLoading}
+                  clientId={selectedClientId}
+                />
+              )}
             </div>
-            <Canvas
-              activeThreadId={activeThreadId}
-              currentResponse={currentResponse}
-              isLoading={isLoading}
-              clientId={selectedClientId}
-            />
           </main>
         </div>
         <Toaster />

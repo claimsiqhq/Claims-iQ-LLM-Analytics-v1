@@ -198,6 +198,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
       const data = await getThread(threadId);
       if (data.turns) {
         const msgs: MessageData[] = [];
+        let latestChartTurn: any = null;
         for (const turn of data.turns) {
           msgs.push({ id: `u-${turn.id}`, role: 'user', content: turn.user_message });
           if (turn.insight_summary) {
@@ -208,6 +209,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
               chartType: turn.chart_type,
               insight: turn.insight_summary,
             });
+            if (turn.chart_data) latestChartTurn = turn;
           } else if (turn.error_message) {
             msgs.push({
               id: `s-${turn.id}`,
@@ -217,11 +219,32 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
           }
         }
         setChatMessages(msgs);
+        if (latestChartTurn) {
+          onNewResponse({
+            thread_id: threadId,
+            turn_id: latestChartTurn.id,
+            chart: latestChartTurn.chart_data
+              ? {
+                  type: latestChartTurn.chart_type || 'bar',
+                  data: latestChartTurn.chart_data,
+                  title: latestChartTurn.chart_data?.datasets?.[0]?.label || 'Chart',
+                }
+              : undefined,
+            insight: latestChartTurn.insight_summary,
+          });
+        } else if (data.turns.length > 0) {
+          const lastTurn = data.turns[data.turns.length - 1];
+          onNewResponse({
+            thread_id: threadId,
+            turn_id: lastTurn.id,
+            insight: lastTurn.insight_summary,
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load thread:', err);
     }
-  }, []);
+  }, [onNewResponse]);
 
   const handleThreadClick = (id: string) => {
     setCurrentThreadId(id);
