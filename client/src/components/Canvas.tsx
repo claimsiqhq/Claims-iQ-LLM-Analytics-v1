@@ -117,10 +117,10 @@ export const Canvas = ({ activeThreadId }: { activeThreadId: string | null }) =>
       <div className="ml-[360px] pt-14 min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
         <div className="max-w-md">
            <img src={emptyStateImg} alt="No Data" className="w-64 h-64 object-contain mx-auto opacity-90 mix-blend-multiply mb-6" />
-           <h2 className="text-2xl font-display font-bold text-brand-deep-purple mb-3">
+           <h1 className="type-h1 text-brand-deep-purple mb-3">
              Claims Intelligence Layer
-           </h2>
-           <p className="text-brand-purple-secondary font-body mb-8 leading-relaxed">
+           </h1>
+           <p className="type-body text-brand-purple-secondary mb-8 text-center">
              Select a thread from the history or start a new conversation to analyze claims data, SLAs, and litigation risks.
            </p>
            {/* Chips hints */}
@@ -140,11 +140,11 @@ export const Canvas = ({ activeThreadId }: { activeThreadId: string | null }) =>
         
         {/* Insight Summary */}
         <div className="bg-white border-l-4 border-brand-purple p-6 rounded-r-xl shadow-sm animate-in slide-in-from-bottom-4 duration-500">
-          <h3 className="text-lg font-display font-bold text-brand-deep-purple mb-2">
+          <h2 className="type-h2 text-brand-deep-purple mb-2">
             Insight Summary
-          </h3>
-          <p className="text-brand-deep-purple font-body text-[16px] leading-relaxed">
-            Adjuster <span className="font-semibold text-brand-purple">Sarah J.</span> has the highest breach rate at <span className="font-mono font-bold bg-brand-purple-light/30 px-1 rounded">12%</span>, primarily driven by complex liability claims in the Northeast region. Overall breach rate is trending up <span className="text-status-alert font-bold">2.4%</span> compared to last month's baseline.
+          </h2>
+          <p className="type-body text-brand-deep-purple">
+            Adjuster <span className="font-semibold text-brand-purple">Sarah J.</span> has the highest breach rate at <span className="type-data bg-brand-purple-light/30 px-1 rounded">12%</span>, primarily driven by complex liability claims in the Northeast region. Overall breach rate is trending up <span className="type-data text-status-alert">2.4%</span> compared to last month's baseline.
           </p>
         </div>
 

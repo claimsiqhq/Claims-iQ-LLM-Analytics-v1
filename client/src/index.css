@@ -51,10 +51,42 @@
     @apply border-border;
   }
   body {
-    @apply font-body antialiased bg-background text-foreground selection:bg-brand-purple-light selection:text-brand-deep-purple;
+    @apply font-body antialiased bg-background text-foreground selection:bg-brand-purple-light selection:text-brand-deep-purple text-[16px]; /* Body 16pt */
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
+  }
+}
+
+/* Typography Hierarchy Classes */
+@layer utilities {
+  .type-h1 {
+    @apply font-display font-extrabold text-[48px] leading-tight;
+  }
+  .type-h2 {
+    @apply font-display font-semibold text-[28px] leading-tight;
+  }
+  .type-body {
+    @apply font-body font-normal text-[16px] leading-relaxed;
+  }
+  .type-caption {
+    @apply font-body font-normal text-[12px] leading-normal;
+  }
+  .type-data {
+    @apply font-mono font-bold text-[14px] leading-normal;
+  }
+
+  /* Custom Scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mask-gradient-right {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
   }
 }
 
@@ -72,18 +104,4 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--color-brand-purple-secondary));
-}
-
-@layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .mask-gradient-right {
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-  }
 }
