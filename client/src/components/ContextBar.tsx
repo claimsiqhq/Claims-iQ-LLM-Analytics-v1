@@ -8,7 +8,7 @@ export const ContextBar = () => {
       {/* Left: Logo & Context */}
       <div className="flex items-center gap-6">
         {/* Logo */}
-        <div className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden">
+        <div className="flex items-center justify-center h-8 w-8 bg-white rounded-full overflow-hidden p-1">
           <img src={logo} alt="Claims IQ Logo" className="w-full h-full object-contain" />
         </div>
         
