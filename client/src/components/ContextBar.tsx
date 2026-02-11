@@ -7,8 +7,8 @@ export const ContextBar = () => {
       {/* Left: Logo & Context */}
       <div className="flex items-center gap-6">
         {/* Logo */}
-        <div className="flex items-center justify-center h-8 w-8 bg-white rounded-full text-brand-deep-purple font-display font-bold text-lg leading-none">
-          iQ
+        <div className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden">
+          <img src="/attached_assets/ClaimsIQ_Logo_02-09_1770799240990.png" alt="Claims IQ Logo" className="w-full h-full object-contain" />
         </div>
         
         {/* Separator */}
