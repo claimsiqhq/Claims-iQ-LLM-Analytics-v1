@@ -1,0 +1,453 @@
+# Claims IQ Analytics — Figma Design Agent Prompt
+
+> **Product:** Claims IQ Analytics — LLM-Powered Conversational Claims Intelligence Dashboard
+> **Version:** V1 — "The Intelligence Layer"
+> **Target Resolution:** 1440px desktop (primary), 1280px (collapsed sidebar), 1920px+ (wide canvas)
+> **Design System:** Claims IQ Brand — Purple/Gold palette, Work Sans / Source Sans Pro / Space Mono typography, Iconoir icons
+
+---
+
+## 1. Product Context
+
+Claims IQ Analytics is a **chat-first analytics interface** for claims operations. There are no traditional dashboards — the conversation IS the product. Users (primarily Claims Managers) ask questions in natural language, receive auto-generated charts and insight summaries, and refine their analysis through threaded dialogue. Dashboards "emerge" organically from pinned conversation threads over time.
+
+The design philosophy is **data density over decoration**, **progressive disclosure**, and **calm confidence**. The interface should feel like a sharp, trustworthy analyst sitting beside you — not a flashy BI tool.
+
+---
+
+## 2. Brand Identity
+
+### 2.1 Color Palette
+
+| Token | Hex | Role | Usage |
+|---|---|---|---|
+| `brand-purple` | `#7763B7` | Core Brand | Headlines, CTAs, active states, primary chart series, selected thread highlight |
+| `brand-purple-secondary` | `#9D8BBF` | Supporting | Section headers, hover states, secondary chart series, info banners |
+| `brand-purple-light` | `#CDBFF7` | Accent | Background tints, chart area fills, selection states, input focus ring |
+| `brand-gold` | `#C6A54E` | Authority / Trust | Trust markers, key action highlights, pinned thread icon, data freshness (green), success states |
+| `brand-gold-light` | `#EAD4A2` | Subtle | Secondary buttons, subtle highlights, data freshness (warning/stale 5–60 min) |
+| `brand-deep-purple` | `#342A4F` | Emphasis | App chrome, sidebar background, primary text color, tooltip backgrounds |
+| `surface-purple-light` | `#F0E6FA` | Surface | Panel backgrounds, card backgrounds, chat panel surface |
+| `surface-grey-lavender` | `#E3DFE8` | Neutral | Form borders, dividers, disabled states, inactive elements |
+| `surface-off-white` | `#F0EDF4` | Background | Canvas background, alternating table rows |
+| `surface-white` | `#FFFFFF` | Surface | Chart backgrounds, chat bubbles, modals, input fields |
+| `status-alert` | `#D94F4F` | Alert | SLA breaches, errors, data stale > 60 min |
+| `text-secondary` | `#6B6280` | Muted Text | Chart labels, metadata, timestamps |
+
+### 2.2 Typography
+
+| Element | Typeface | Weight | Size | Color |
+|---|---|---|---|---|
+| H1 — Page / Section headers | Work Sans | ExtraBold (800) | 48px | `#342A4F` |
+| H2 — Subsections | Work Sans | SemiBold (600) | 36px | `#7763B7` |
+| H3 — Sub-subsections | Work Sans | SemiBold (600) | 28px | `#342A4F` |
+| Body text | Source Sans Pro | Regular (400) | 16px | `#342A4F` |
+| Chat messages | Source Sans Pro | Regular (400) | 14px | `#342A4F` |
+| Chart axis labels | Source Sans Pro | Medium (500) | 12px | `#6B6280` |
+| Insight summary | Source Sans Pro | Regular (400) | 16px | `#342A4F` |
+| Data values / KPIs | Space Mono | Bold (700) | 14px | `#342A4F` |
+| Metadata / timestamps | Source Sans Pro | Regular (400) | 12px | `#6B6280` |
+| Buttons — Primary | Source Sans Pro | SemiBold (600) | 14px | `#FFFFFF` on `#7763B7` |
+| Buttons — Secondary | Source Sans Pro | Medium (500) | 14px | `#342A4F` on `#EAD4A2` |
+
+### 2.3 Iconography
+
+Use the **Iconoir** icon library (iconoir.com) — minimalist, thin-line style.
+
+- Inline icons: 20px
+- Navigation / action icons: 24px
+- Icon color inherits parent text color or uses `#6B6280` for neutral states
+
+### 2.4 Chart Color Sequence
+
+When rendering multi-series charts, apply colors in this order:
+
+1. `#7763B7` — Core Purple (Series 1)
+2. `#C6A54E` — Gold (Series 2)
+3. `#9D8BBF` — Secondary Purple (Series 3)
+4. `#EAD4A2` — Light Gold (Series 4)
+5. `#CDBFF7` — Light Purple (Series 5)
+6. Comparison overlay: `#342A4F` at 40% opacity
+
+### 2.5 Logo
+
+The Claims iQ logo is a stylized **"iQ" monogram** — a lowercase "i" with a dot and a circular "Q" with an inner dot and tail, rendered in Deep Purple `#342A4F`. A white variant exists for dark backgrounds. The logo appears at 32px height in the Context Bar and at larger display sizes on splash/empty states.
+
+### 2.6 Illustration Style
+
+Use **Y2K Abstract Retro Shapes** for empty states and onboarding moments only. Keep illustrations minimal and subordinate to data.
+
+---
+
+## 3. Screen Architecture
+
+The entire application lives on a **single screen** with three persistent zones. There is no page-level navigation, no separate dashboard screen, no settings page in V1.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  CONTEXT BAR  (top, full width, ~56px)                              │
+│  [Logo] [Client Selector ▾] [Session Info] ···· [Data Freshness 🟢] │
+├────────────────┬─────────────────────────────────────────────────────┤
+│  CHAT PANEL    │  CANVAS                                            │
+│  (left, 360px  │  (center, fluid width)                             │
+│   fixed)       │                                                    │
+│                │  ┌─────────────────────────────────────────────┐   │
+│  [New Thread]  │  │  Insight Summary (2-4 lines)                │   │
+│                │  ├─────────────────────────────────────────────┤   │
+│  ── Pinned ──  │  │                                             │   │
+│  Thread 1 📌   │  │  Chart Area (min 400px height)              │   │
+│  Thread 2 📌   │  │                                             │   │
+│                │  │                                             │   │
+│  ── Today ──   │  │                                             │   │
+│  Thread 3      │  ├─────────────────────────────────────────────┤   │
+│  Thread 4      │  │  Metadata Bar (~60px)                       │   │
+│                │  │  [Definition] [Filters] [Time] [Fresh] [⤓]  │   │
+│  ── Earlier ── │  └─────────────────────────────────────────────┘   │
+│  Thread 5      │                                                    │
+│  Thread 6      │                                                    │
+│                │                                                    │
+│  ┌──────────┐  │                                                    │
+│  │ Input    │  │                                                    │
+│  │ Area     │  │                                                    │
+│  └──────────┘  │                                                    │
+├────────────────┴─────────────────────────────────────────────────────┤
+│  [Prompt Chips: Throughput | SLA | Quality | Cost | Risk] (scroll)  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.1 Context Bar
+
+- **Position:** Top, full width, fixed
+- **Height:** ~56px
+- **Background:** `#342A4F` (Deep Purple)
+- **Contents (left to right):**
+  - Claims iQ logo mark (white variant, 32px)
+  - Client selector dropdown — displays active client name in `#FFFFFF`, Work Sans SemiBold 16px. Dropdown arrow icon from Iconoir. Clicking opens a searchable list of available clients. Selecting a new client triggers a confirmation dialog: *"Switching to [Client Name] will start a new session. Continue?"*
+  - Session info — subtle text: "Session started 9:14 AM" in Source Sans Pro Regular 12px, `#9D8BBF`
+- **Contents (right side):**
+  - Data freshness indicator — a small circle (10px) with label:
+    - `#C6A54E` (Gold) + "Live" = data < 5 min old
+    - `#EAD4A2` (Light Gold) + "12 min ago" = data 5–60 min old
+    - `#D94F4F` (Red) + "Stale: 2 hrs" = data > 60 min old
+
+### 3.2 Chat Panel
+
+- **Position:** Left sidebar, 360px fixed width
+- **Background:** `#F0E6FA` (Light Purple Grey surface)
+- **Border-right:** 1px `#E3DFE8`
+
+#### Top Section
+- **"New conversation" button** — Full width, 40px height, `#7763B7` background, `#FFFFFF` text, Source Sans Pro SemiBold 14px, Iconoir "plus" icon (20px). Rounded corners 8px.
+
+#### Thread List
+- Grouped by: **Pinned** (gold pin icon beside each), **Today**, **This Week**, **Earlier**
+- Group labels: Source Sans Pro Medium 11px, `#6B6280`, uppercase tracking 0.5px
+- Each thread card:
+  - Height: ~64px
+  - Background: `#FFFFFF` (default), `#CDBFF7` (active/selected)
+  - Left edge: 3px accent bar — `#7763B7` when active, transparent otherwise
+  - Content: Thread label = the user's initial question, truncated at 2 lines. Source Sans Pro Regular 13px, `#342A4F`
+  - Small chart-type icon (Iconoir: bar-chart, line-chart, table, pie-chart) at 16px, `#9D8BBF`, top-right of card
+  - Timestamp: "2h ago" — Source Sans Pro Regular 11px, `#6B6280`, bottom-right
+  - Pinned threads show a small gold pin icon (`#C6A54E`, 14px) beside the chart-type icon
+  - Pinned section supports **drag-and-drop reordering**
+
+#### Input Area (Bottom of Chat Panel)
+- Sticky at bottom of panel
+- **Text input field:**
+  - Background: `#FFFFFF`
+  - Border: 1px `#E3DFE8`, on focus: 2px `#CDBFF7`
+  - Border-radius: 12px
+  - Placeholder text: rotates through example questions in Source Sans Pro Regular 14px, `#9D8BBF` — e.g., *"Ask about SLA breach rate..."*, *"Show claims received this week..."*, *"What's the backlog by stage?"*
+  - Single-line default, auto-expands to multi-line as user types (max 4 lines before scroll)
+  - Submit: Enter key (Shift+Enter for newline)
+  - Send button: Appears when input is non-empty — circular, 32px, `#7763B7` background, white Iconoir "send" arrow icon
+  - Disabled state during response generation: input greyed out with subtle pulse animation on the send button area
+
+- **Suggested prompt chips:**
+  - Positioned in a horizontal scrollable row **above** the input field
+  - Each chip: pill shape, background `#FFFFFF`, border 1px `#E3DFE8`, text Source Sans Pro Regular 12px `#342A4F`, padding 6px 12px, border-radius 16px
+  - On hover: border `#CDBFF7`, background `#F0E6FA`
+  - Clicking a chip populates the input (does NOT auto-submit)
+  - Categories as row headers or color-coded by: Throughput, Speed & SLA, Quality, Cost & LLM, Risk
+
+- **Intent preview (appears below input when parseable):**
+  - Background: `#F0E6FA`, border-radius 8px, padding 8px 12px
+  - Text: Source Sans Pro Regular 12px, `#6B6280`
+  - Format: *"Showing: SLA Breach Rate | Grouped by: Adjuster | Time: Last 30 days | Chart: Bar"*
+
+- **Autocomplete dropdown:**
+  - Max 3 suggestions, triggered as user types
+  - Each suggestion: 36px row, Source Sans Pro Regular 13px, hover background `#F0E6FA`
+  - Sources: previously asked questions, common questions for active client, metric name matches
+
+#### Chat Messages (within active thread)
+- **User messages:** Right-aligned bubble, background `#7763B7`, text `#FFFFFF`, Source Sans Pro Regular 14px, border-radius 12px 12px 0 12px, max-width 85% of panel
+- **System response cards:** Left-aligned, background `#FFFFFF`, border 1px `#E3DFE8`, border-radius 12px, padding 12px. Contains:
+  - Compact chart thumbnail (80px height, simplified)
+  - 1-line insight excerpt, Source Sans Pro Regular 13px, `#342A4F`
+  - Clicking the card highlights/loads the corresponding chart state on the Canvas
+- **Typing indicator:** Three animated dots in `#9D8BBF` inside a system bubble
+
+### 3.3 Canvas
+
+- **Position:** Center, fluid width (fills remaining space right of Chat Panel)
+- **Background:** `#F0EDF4` (Off White)
+- **Padding:** 32px all sides
+
+#### Sub-region: Insight Summary
+- **Position:** Top of canvas
+- **Height:** Auto (typically 2–4 lines)
+- **Style:** Source Sans Pro Regular 16px, `#342A4F`, line-height 1.5
+- **Background:** `#FFFFFF` card with subtle shadow (`0 1px 3px rgba(52,42,79,0.08)`), border-radius 12px, padding 16px 20px
+- **Content:** LLM-generated insight that highlights what is **notable, surprising, or actionable** — never a plain restatement of what the chart shows
+- **Left accent bar:** 3px `#C6A54E` (Gold) on the left edge of the card — signals authority and importance
+
+#### Sub-region: Chart Area
+- **Position:** Below insight, flexible height (minimum 400px)
+- **Background:** `#FFFFFF` card, border-radius 12px, padding 24px, same subtle shadow
+- **Chart styles:**
+  - Grid lines: `#E3DFE8` at 0.5px
+  - Axis labels: Source Sans Pro Medium 12px, `#6B6280`
+  - Data labels (on hover / always for small datasets): Space Mono Bold 12px, `#342A4F`
+  - Tooltip: `#342A4F` background, `#FFFFFF` text, Source Sans Pro Regular 13px, border-radius 8px, padding 8px 12px. Shows exact value, % of total, comparison to prior period
+  - Legend: Bottom of chart area, Source Sans Pro Regular 12px, color swatches 10px circles
+- **Chart types to design:**
+  - Line chart (time-series trends)
+  - Bar chart (category comparisons, horizontal and vertical)
+  - Stacked bar chart (part-to-whole)
+  - Area chart (volume trends)
+  - Pie chart (composition, max 6 segments — use sparingly)
+  - Data table (sortable, alternating row backgrounds `#F0EDF4` / `#FFFFFF`)
+- **Interactions:**
+  - Hover any data point: tooltip appears
+  - Click a bar / data point / pie slice: triggers drill-down (Section 5)
+  - Click-and-drag on time axis: zoom into time range
+  - Right-click any element: context menu with "Filter to this", "Exclude this", "Drill into this"
+- **Toolbar** (top-right of chart card):
+  - Undo button (Iconoir "undo", 20px, `#6B6280`) — steps back through refinements
+  - Chart/Table toggle (Iconoir "graph-up" / "table-rows", 20px)
+  - Full-screen expand (Iconoir "expand", 20px)
+
+#### Sub-region: Metadata Bar
+- **Position:** Below chart, inside the chart card
+- **Height:** ~60px
+- **Background:** `#F0E6FA` strip inside the chart card, border-radius 0 0 12px 12px
+- **Contents (left to right):**
+  - **Metric definition:** Clickable label, Source Sans Pro Medium 13px, `#7763B7`. On click, expands a tooltip showing exact calculation formula
+  - **Active filters:** Pill-shaped tags — background `#CDBFF7`, text `#342A4F`, Source Sans Pro Regular 12px, each with a small "x" to remove. E.g., `Region: Southeast ×`, `Peril: Water Damage ×`
+  - **Time range:** Natural language label ("Last 30 days"), clickable to open a date picker
+  - **Data freshness:** Small colored dot + text (same scheme as Context Bar)
+  - **"Show query details"** link: Source Sans Pro Regular 12px, `#9D8BBF`, underline on hover. Expands to show parsed intent as human-readable key-value pairs (not raw JSON)
+- **Contents (right side):**
+  - **Chart/Table toggle** (if not in toolbar)
+  - **Export button:** Iconoir "download" icon, 20px. Dropdown: "Export as PNG", "Export as CSV"
+
+#### Sub-region: Assumption Pills
+- Positioned between Insight Summary and Chart Area (or inline within Metadata Bar — designer's discretion)
+- Each assumption: pill shape, background `#EAD4A2` (Light Gold), text `#342A4F`, Source Sans Pro Regular 12px
+- Clickable — clicking opens an inline editor to change the value without re-asking
+- Example: `Time: Last 30 days` `Metric: End-to-end cycle time` `Grouping: Daily`
+
+---
+
+## 4. Animations & Transitions
+
+| Trigger | Animation | Duration | Easing |
+|---|---|---|---|
+| New chart appears | Fade in from slight scale-down (0.97 → 1.0) | 300ms | ease-out |
+| Refinement (same chart updates) | Bars/lines morph to new positions | 400ms | ease-in-out |
+| Chart type switch | Cross-fade between old and new | 350ms | ease-in-out |
+| Drill-down opens | Chart slides left, claims table slides in from right | 300ms | ease-out |
+| Drill-down closes | Reverse of above | 300ms | ease-in |
+| Thread selection | Canvas content cross-fades to new thread's chart state | 250ms | ease-out |
+| Loading skeleton | Pulse animation on placeholder shapes | Continuous | — |
+
+---
+
+## 5. Drill-Down Panel
+
+When a user clicks a chart element (bar, data point, slice) or says "show me the claims behind this":
+
+- The chart compresses to ~60% width and slides left
+- A **claims list panel** slides in from the right, occupying ~40% of canvas width
+- **Breadcrumb trail** appears above the chart: *SLA Breach Rate → Southeast Region → Water Damage → 23 Claims*. Each segment is clickable to navigate back up the chain.
+
+### Claims List Table
+- Columns: Claim ID (link), Status, Adjuster, Stage, Age (days), Severity, Key Issues
+- Sortable by clicking column headers (Iconoir sort arrows)
+- Alternating row backgrounds: `#FFFFFF` / `#F0EDF4`
+- Claim ID is a **deep link** to Claims IQ Core (opens in new tab), styled as `#7763B7` underline on hover
+- **Summary stats** above table: Count badge, average age, breach % — displayed in Space Mono Bold 14px
+
+### Back Navigation
+- "← Back to chart" button, top-left of drill-down panel
+- Closes drill-down, chart re-expands to full width (reverse slide animation)
+
+---
+
+## 6. Application States — Design Each of These
+
+### 6.1 Empty State (First Visit)
+- Canvas shows a centered illustration (Y2K Abstract Retro Shapes, muted), with:
+  - Claims iQ logo (large, `#7763B7`)
+  - Headline: **"Ask a question to get started"** — Work Sans SemiBold 28px, `#342A4F`
+  - Subtext: *"Claims IQ Analytics turns your questions into charts, insights, and answers."* — Source Sans Pro Regular 16px, `#6B6280`
+- Chat Panel shows the welcome message as a system bubble + the full set of suggested prompt chips, grouped by category with small category headers
+- Context Bar has the client selector active and ready
+
+### 6.2 Loading State
+- User message appears in chat
+- Typing indicator (3 dots) animates in chat
+- Canvas shows a **skeleton chart**: grey (`#E3DFE8`) rectangle shapes mimicking a bar chart, with a slow pulse animation. Skeleton insight lines above. Skeleton metadata bar below.
+
+### 6.3 Success State
+- Chart fully rendered with insight summary, metadata bar, assumption pills
+- Compact response card appears in Chat Panel
+
+### 6.4 Partial Data State
+- Chart renders with available data
+- Yellow banner across top of chart card: `#EAD4A2` background, `#342A4F` text, Iconoir "warning-triangle" icon: *"Some data is unavailable for this time range. Showing partial results."*
+- Thread card in Chat Panel shows a small warning icon
+
+### 6.5 Error State
+- Chat Panel: Error message bubble (left-aligned, border-left 3px `#D94F4F`): *"I need a bit more context. Did you mean cycle time for all stages, or a specific stage?"*
+- Canvas: Centered message — Iconoir "question-mark" icon at 48px `#9D8BBF`, headline *"Unable to generate this chart"*, subtext with suggestion, "Try again" button (`#7763B7`)
+- Retry button present in the chat error bubble
+
+### 6.6 No Results State
+- Chat Panel: Info bubble with Iconoir "info-circle" icon
+- Canvas: *"No data matches your query for this time range."* + suggestions for broadening (relaxing filters, expanding time)
+
+### 6.7 Unsupported Query State
+- Chat Panel: System explains limitation and suggests closest supported query
+- Canvas: Suggestion cards (clickable) for related supported queries
+
+---
+
+## 7. Client Switching Confirmation Dialog
+
+- **Trigger:** User selects a different client from the Context Bar dropdown
+- **Style:** Modal overlay, centered, `#FFFFFF` background, border-radius 16px, shadow `0 8px 32px rgba(52,42,79,0.15)`
+- **Content:**
+  - Headline: **"Switch to [Client Name]?"** — Work Sans SemiBold 20px
+  - Body: *"This will start a new session. Your current threads will remain accessible."* — Source Sans Pro Regular 14px
+  - Buttons: "Cancel" (secondary, `#EAD4A2` bg) | "Switch Client" (primary, `#7763B7` bg)
+- **Backdrop:** `#342A4F` at 40% opacity
+
+---
+
+## 8. Responsive Behavior
+
+| Breakpoint | Behavior |
+|---|---|
+| **1440px+** (default) | Full three-zone layout as described above |
+| **1280px** | Chat Panel collapses to icon-only sidebar (~64px). Thread labels hidden, only chart-type icons + pin icons visible. Click to expand temporarily as an overlay. Input still functional in collapsed state. |
+| **1920px+** | Canvas gains additional horizontal space. Chart area stretches. Consider 2-column drill-down (chart stays full width, claims table drops below). |
+| **< 1280px / Tablet / Mobile** | Out of scope for V1. Show a graceful "Desktop recommended" message. |
+
+---
+
+## 9. Core Screens to Design (Figma Pages)
+
+Design each of the following as a complete, pixel-accurate frame at 1440px width:
+
+1. **Empty State** — First visit. Welcome illustration, suggested prompts visible, no threads yet, client selected in Context Bar.
+
+2. **Active Conversation** — User has asked "Show me SLA breach rate this month vs. last month." Chart (bar or line with comparison series) is rendered on Canvas with insight summary, metadata bar, assumption pills. Chat Panel shows the user's message + compact response card. 1–2 older threads visible in the sidebar.
+
+3. **Threaded Refinement** — Same thread as Screen 2. User has followed up with "Break that down by adjuster." Chart has updated in-place. Chat Panel shows the full thread (original question + response card + refinement question + new response card). Canvas shows the updated chart with adjuster breakdown.
+
+4. **Drill-Down Active** — User clicked a bar segment in the chart. Chart compressed to 60%, claims list panel visible on the right. Breadcrumb trail showing *SLA Breach Rate → Adjuster: Sarah Chen → 12 Claims*. Claims table with sortable columns and deep-link IDs.
+
+5. **Multiple Threads + Pinned** — Chat Panel shows 2 pinned threads (with gold pin icons) at top, then Today section with 3 threads, This Week section with 2 threads. One thread is active (highlighted). Canvas shows that thread's chart.
+
+6. **Loading State** — User just submitted a query. Typing indicator in chat, skeleton chart on Canvas.
+
+7. **Error State** — Query was too vague. Chat shows error guidance message with suggestion. Canvas shows the error state with retry button and suggested alternatives.
+
+8. **Client Switch Confirmation** — Modal dialog overlaying the main interface, with the confirmation prompt.
+
+---
+
+## 10. Component Library to Build
+
+Create these as reusable Figma components with variants:
+
+| Component | Variants / States |
+|---|---|
+| **Context Bar** | Default, client-switching, stale-data-warning |
+| **Client Selector** | Closed, open/dropdown, searching |
+| **Data Freshness Indicator** | Fresh (gold dot), Warning (light gold dot), Stale (red dot) |
+| **Thread Card** | Default, active, pinned, with-warning |
+| **Chat Input** | Empty (with rotating placeholder), typing, intent-preview-visible, disabled/loading |
+| **Suggested Prompt Chip** | Default, hover, selected |
+| **User Message Bubble** | Single-line, multi-line |
+| **System Response Card** | Default (with chart thumbnail + insight excerpt), loading (typing dots), error, info |
+| **Insight Summary Card** | Default, collapsed (if collapsible) |
+| **Chart Card** | With bar chart, line chart, stacked bar, area, pie, table |
+| **Chart Tooltip** | With value, with value + comparison, with value + % |
+| **Metadata Bar** | Default, expanded (showing query details), stale-warning |
+| **Filter Pill** | Default, removable (with X) |
+| **Assumption Pill** | Default, editing (inline editor open) |
+| **Drill-Down Panel** | Claims list table + summary stats + breadcrumb |
+| **Breadcrumb Trail** | 2-level, 3-level, 4-level |
+| **Button** | Primary (`#7763B7`), Secondary (`#EAD4A2`), Ghost, Disabled |
+| **Modal Dialog** | Client switch confirmation, generic confirmation |
+| **Skeleton Loader** | Chart skeleton, text skeleton, card skeleton |
+| **Empty State** | First visit (with illustration), no results, unsupported |
+| **Error State** | Vague query, metric not found, data unavailable, system error |
+| **Export Menu** | Closed, open (PNG / CSV options) |
+| **Autocomplete Dropdown** | 1 suggestion, 2 suggestions, 3 suggestions |
+
+---
+
+## 11. Figma Setup Requirements
+
+### 11.1 Color Styles
+Register every color from Section 2.1 as a Figma color style with the naming convention `Brand/Purple/Core`, `Brand/Purple/Secondary`, `Brand/Gold/Primary`, `Surface/Off White`, `Status/Alert`, etc.
+
+### 11.2 Text Styles
+Register every typography entry from Section 2.2 as a Figma text style: `Heading/H1`, `Heading/H2`, `Heading/H3`, `Body/Default`, `Body/Chat`, `Data/Value`, `Meta/Label`, `Button/Primary`, etc.
+
+### 11.3 Fonts to Install
+- **Work Sans** — ExtraBold (800), SemiBold (600)
+- **Source Sans Pro** — Regular (400), Medium (500), SemiBold (600)
+- **Space Mono** — Bold (700)
+
+### 11.4 Icon Library
+Import **Iconoir** as a Figma component library (available as a Figma community file). Key icons needed: send, plus, pin, bar-chart, graph-up, table-rows, pie-chart, download, expand, undo, warning-triangle, info-circle, question-mark, search, x-circle, sort-up, sort-down, chevron-down, arrow-left, external-link.
+
+### 11.5 Assets
+- Claims iQ logo mark (iQ monogram) — purple variant (`#342A4F`) and white variant (`#FFFFFF`)
+- Y2K Abstract Retro Shapes illustration set (for empty states only)
+
+---
+
+## 12. Interaction Notes for Prototyping
+
+- **Thread selection:** Click thread card → Canvas cross-fades to that thread's chart (250ms)
+- **Prompt chip click:** Chip text appears in input field; input gains focus
+- **Submit question:** Enter key or Send button → user bubble appears → typing indicator → skeleton → chart renders
+- **Refinement:** Same flow, but chart morphs in-place instead of fresh render
+- **Drill-down:** Click chart element → chart compresses left, claims panel slides in right
+- **Back from drill-down:** Click "← Back to chart" → reverse animation
+- **Pin a thread:** Click pin icon on thread card → thread moves to Pinned section with gold pin icon
+- **Export:** Click export icon → dropdown appears → click PNG or CSV → browser download triggers
+- **Client switch:** Click client name → dropdown → select new client → modal appears → confirm → conversation resets
+- **Undo refinement:** Click undo in chart toolbar → chart morphs back to previous state
+
+---
+
+## 13. Design Principles (Summary)
+
+1. **Data density over decoration.** Maximize information per pixel. No ornamental chrome.
+2. **Progressive disclosure.** Essential view first — details on interaction (hover, click, expand).
+3. **Calm confidence.** The purple/gold palette conveys authority and trust. Red is reserved exclusively for genuine alerts (SLA breaches, errors, stale data).
+4. **Spatial consistency.** Chart always in the same place. Metadata always below. Insight always above. No layout shifts between states.
+5. **Human + Intelligent.** The interface empowers the Claims Manager — it does not overwhelm or replace them. Tone is professional, concise, and helpful.
+6. **Radical transparency.** Every chart shows its assumptions, filters, time range, data freshness, and parsed intent. Nothing is a black box.
+
+---
+
+*End of Figma Agent Prompt — Claims IQ Analytics V1*
