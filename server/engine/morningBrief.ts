@@ -40,6 +40,7 @@ export class MorningBriefGenerator {
         .from("morning_briefs")
         .select("*")
         .eq("client_id", clientId)
+        .eq("user_id", userId)
         .eq("brief_date", today)
         .single();
 
@@ -58,7 +59,7 @@ export class MorningBriefGenerator {
 
       const { data: insertedBrief, error } = await supabase
         .from("morning_briefs")
-        .insert([
+        .upsert(
           {
             client_id: clientId,
             user_id: userId,
@@ -68,7 +69,8 @@ export class MorningBriefGenerator {
             anomaly_count: metricsSnapshot.topAnomalies.length,
             generated_at: new Date().toISOString(),
           },
-        ])
+          { onConflict: "client_id,user_id,brief_date" }
+        )
         .select()
         .single();
 

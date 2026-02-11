@@ -35,7 +35,7 @@ import {
 import { queryCache } from "./engine/queryCache";
 import { log } from "./index";
 import { runSeed } from "./seed";
-import { getDefaultClientId, getDefaultUserId } from "./config/defaults";
+import { getDefaultClientId, getDefaultUserId, invalidateDefaultsCache } from "./config/defaults";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -70,6 +70,7 @@ export async function registerRoutes(
     try {
       log("Starting database seed...", "seed");
       await runSeed();
+      invalidateDefaultsCache();
       res.json({ status: "ok", message: "Database seeded successfully" });
     } catch (err: any) {
       log(`Seed error: ${err.message}`, "seed");

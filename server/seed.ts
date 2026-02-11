@@ -25,18 +25,18 @@ const METRIC_DEFINITIONS = [
 ];
 
 const ADJUSTERS = [
-  { id: "00000000-0000-0000-0000-000000000101", full_name: "Sarah Chen", email: "sarah.chen@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000102", full_name: "Mike Torres", email: "mike.torres@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000103", full_name: "Lisa Park", email: "lisa.park@acme.com", team: "Team Beta" },
-  { id: "00000000-0000-0000-0000-000000000104", full_name: "James Wilson", email: "james.wilson@acme.com", team: "Team Beta" },
-  { id: "00000000-0000-0000-0000-000000000105", full_name: "Maria Garcia", email: "maria.garcia@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000106", full_name: "David Kim", email: "david.kim@acme.com", team: "Team Beta" },
-  { id: "00000000-0000-0000-0000-000000000107", full_name: "Rachel Adams", email: "rachel.adams@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000108", full_name: "Tom Rodriguez", email: "tom.rodriguez@acme.com", team: "Team Beta" },
-  { id: "00000000-0000-0000-0000-000000000109", full_name: "Amy Liu", email: "amy.liu@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000110", full_name: "Chris Johnson", email: "chris.johnson@acme.com", team: "Team Beta" },
-  { id: "00000000-0000-0000-0000-000000000111", full_name: "Nina Patel", email: "nina.patel@acme.com", team: "Team Alpha" },
-  { id: "00000000-0000-0000-0000-000000000112", full_name: "Brian Murphy", email: "brian.murphy@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "Sarah Chen", email: "sarah.chen@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "Mike Torres", email: "mike.torres@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "Lisa Park", email: "lisa.park@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "James Wilson", email: "james.wilson@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "Maria Garcia", email: "maria.garcia@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "David Kim", email: "david.kim@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "Rachel Adams", email: "rachel.adams@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "Tom Rodriguez", email: "tom.rodriguez@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "Amy Liu", email: "amy.liu@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "Chris Johnson", email: "chris.johnson@acme.com", team: "Team Beta" },
+  { id: crypto.randomUUID(), full_name: "Nina Patel", email: "nina.patel@acme.com", team: "Team Alpha" },
+  { id: crypto.randomUUID(), full_name: "Brian Murphy", email: "brian.murphy@acme.com", team: "Team Beta" },
 ];
 
 const PERILS = ["Water Damage", "Fire", "Theft", "Wind/Hail", "Liability"];

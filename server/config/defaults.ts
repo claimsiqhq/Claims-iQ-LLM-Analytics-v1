@@ -36,12 +36,18 @@ async function refreshCache(): Promise<void> {
 
 export async function getDefaultClientId(): Promise<string> {
   await refreshCache();
-  return cachedDefaultClientId || "";
+  if (!cachedDefaultClientId) {
+    throw new Error("No clients found in database. Please seed the database first via POST /api/seed.");
+  }
+  return cachedDefaultClientId;
 }
 
 export async function getDefaultUserId(): Promise<string> {
   await refreshCache();
-  return cachedDefaultUserId || "";
+  if (!cachedDefaultUserId) {
+    throw new Error("No users found in database. Please seed the database first via POST /api/seed.");
+  }
+  return cachedDefaultUserId;
 }
 
 export function invalidateDefaultsCache(): void {
