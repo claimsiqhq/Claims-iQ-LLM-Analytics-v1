@@ -116,7 +116,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
       </div>
 
       <div className="px-6 py-4">
-        <div className={`transition-all duration-300 ${isExpanded ? "max-h-96" : "max-h-12 overflow-hidden"}`}>
+        <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? "max-h-[2000px]" : "max-h-12"}`}>
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
             {isExpanded ? briefData.content : contentPreview}
           </p>
