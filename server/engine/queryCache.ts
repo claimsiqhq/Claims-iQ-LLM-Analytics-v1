@@ -57,6 +57,7 @@ export class QueryCache {
 
       const { error } = await supabase.from("query_cache").upsert(
         {
+          query_hash: cacheKey,
           cache_key: cacheKey,
           metric_slug: metricSlug,
           client_id: clientId,

@@ -209,3 +209,139 @@ CREATE INDEX IF NOT EXISTS idx_stage_history_stage ON claim_stage_history(stage,
 CREATE INDEX IF NOT EXISTS idx_threads_user_client ON threads(user_id, client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_threads_pinned ON threads(user_id, is_pinned) WHERE is_pinned = TRUE;
 CREATE INDEX IF NOT EXISTS idx_turns_thread ON thread_turns(thread_id, turn_index);
+
+-- 12. Document Tables (required for enhanced metrics)
+CREATE TABLE IF NOT EXISTS claim_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  area_documented TEXT,
+  damage_type TEXT,
+  damage_severity TEXT,
+  file_path TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS claim_policies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  coverage_type TEXT,
+  endorsements TEXT[] DEFAULT '{}',
+  roof_replacement_included BOOLEAN DEFAULT FALSE,
+  replacement_cost_value DECIMAL(12,2),
+  actual_cash_value DECIMAL(12,2),
+  deductible DECIMAL(12,2),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS claim_estimates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  estimate_amount DECIMAL(12,2),
+  revision_number INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS claim_billing (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  amount DECIMAL(12,2) NOT NULL,
+  billing_type TEXT,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_claim_photos_claim ON claim_photos(claim_id);
+CREATE INDEX IF NOT EXISTS idx_claim_policies_claim ON claim_policies(claim_id);
+CREATE INDEX IF NOT EXISTS idx_claim_estimates_claim ON claim_estimates(claim_id);
+CREATE INDEX IF NOT EXISTS idx_claim_billing_claim ON claim_billing(claim_id);
+
+-- 13. Enhancement Tables (anomaly detection, alerts, morning briefs, query cache)
+CREATE TABLE IF NOT EXISTS anomaly_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  metric_slug TEXT NOT NULL,
+  direction TEXT NOT NULL CHECK (direction IN ('spike', 'drop')),
+  z_score DECIMAL(10,4) NOT NULL,
+  current_value DECIMAL(12,4) NOT NULL,
+  baseline_mean DECIMAL(12,4) NOT NULL,
+  baseline_stddev DECIMAL(12,4) NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
+  detected_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS alert_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  metric_slug TEXT NOT NULL,
+  condition TEXT NOT NULL CHECK (condition IN ('gt', 'lt', 'eq', 'change_pct')),
+  threshold DECIMAL(12,4) NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'warning' CHECK (severity IN ('info', 'warning', 'critical')),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS morning_briefs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  brief_date DATE NOT NULL,
+  content TEXT NOT NULL,
+  metrics_snapshot JSONB,
+  anomaly_count INTEGER DEFAULT 0,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(client_id, brief_date)
+);
+
+CREATE TABLE IF NOT EXISTS query_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  query_hash TEXT NOT NULL,
+  cache_key TEXT UNIQUE NOT NULL,
+  metric_slug TEXT NOT NULL,
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  result_data JSONB NOT NULL,
+  hit_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_anomaly_events_client ON anomaly_events(client_id);
+CREATE INDEX IF NOT EXISTS idx_anomaly_events_detected ON anomaly_events(client_id, detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_rules_client ON alert_rules(client_id);
+CREATE INDEX IF NOT EXISTS idx_morning_briefs_client_date ON morning_briefs(client_id, brief_date DESC);
+CREATE INDEX IF NOT EXISTS idx_query_cache_key ON query_cache(cache_key);
+CREATE INDEX IF NOT EXISTS idx_query_cache_expires ON query_cache(expires_at);
+
+-- 14. Ingestion Jobs (PDF document processing)
+CREATE TABLE IF NOT EXISTS ingestion_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  document_name TEXT NOT NULL,
+  document_size INTEGER,
+  status TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed')),
+  started_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  extraction_results JSONB,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_client ON ingestion_jobs(client_id);
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_status ON ingestion_jobs(client_id, status);
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_started ON ingestion_jobs(client_id, started_at DESC);
+
+-- 15. Enhanced metric definitions (11 new metrics)
+INSERT INTO metric_definitions (slug, display_name, category, description, calculation, unit, default_chart_type, allowed_dimensions, allowed_time_grains, is_active)
+VALUES
+  ('photo_count_per_claim', 'Average Photo Count per Claim', 'documentation', 'Average number of photos documented per claim', 'AVG(photo_count)', 'photos', 'line', '{}', ARRAY['day','week','month'], true),
+  ('areas_documented', 'Average Areas Documented per Claim', 'documentation', 'Average number of distinct areas documented per claim', 'AVG(distinct_areas)', 'areas', 'line', '{}', ARRAY['day','week','month'], true),
+  ('damage_type_coverage', 'Damage Type Coverage Distribution', 'documentation', 'Distribution of documented damage types across claims', 'COUNT by damage_type', 'count', 'column', '{}', ARRAY['day','week','month'], true),
+  ('coverage_type_distribution', 'Coverage Type Distribution', 'policy', 'Distribution of claims by policy coverage type', 'COUNT by coverage_type', 'count', 'column', '{}', ARRAY['day','week','month'], true),
+  ('endorsement_frequency', 'Average Endorsements per Policy', 'policy', 'Average number of policy endorsements per claim', 'AVG(endorsements)', 'endorsements', 'line', '{}', ARRAY['day','week','month'], true),
+  ('roof_coverage_rate', 'Roof Coverage Rate', 'policy', 'Percentage of claims with roof replacement coverage', 'SUM(roof_included)/COUNT*100', 'percent', 'line', '{}', ARRAY['day','week','month'], true),
+  ('estimate_accuracy', 'Estimate Accuracy (Revision Count)', 'financial', 'Average number of estimate revisions per claim', 'AVG(revision_count)', 'revisions', 'line', '{}', ARRAY['day','week','month'], true),
+  ('depreciation_ratio', 'Depreciation Ratio', 'financial', 'Average depreciation to replacement cost ratio', 'AVG(acv/rcv)', 'ratio', 'line', '{}', ARRAY['day','week','month'], true),
+  ('net_claim_amount_trend', 'Net Claim Amount Trend', 'financial', 'Average net claim amount (replacement cost minus deductible and depreciation)', 'AVG(net_amount)', 'currency', 'line', '{}', ARRAY['day','week','month'], true),
+  ('total_expenses_per_claim', 'Total Expenses per Claim', 'financial', 'Average total billed expenses per claim', 'AVG(total_expenses)', 'currency', 'line', '{}', ARRAY['day','week','month'], true),
+  ('expense_type_breakdown', 'Expense Type Breakdown', 'financial', 'Distribution of expenses by billing type', 'SUM by billing_type', 'currency', 'stacked_bar', '{}', ARRAY['day','week','month'], true)
+ON CONFLICT (slug) DO NOTHING;

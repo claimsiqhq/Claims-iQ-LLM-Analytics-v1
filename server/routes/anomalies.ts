@@ -4,6 +4,14 @@ import { supabase } from "../config/supabase";
 
 const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
 
+function mapConditionToSchema(condition: string): string {
+  if (condition === "exceeds") return "gt";
+  if (condition === "below") return "lt";
+  if (condition === "anomaly") return "change_pct";
+  if (["gt", "lt", "eq", "change_pct"].includes(condition)) return condition;
+  return "gt";
+}
+
 export const anomaliesRouter = Router();
 
 anomaliesRouter.get("/api/anomalies", async (req: Request, res: Response) => {
@@ -53,11 +61,11 @@ anomaliesRouter.get("/api/anomalies", async (req: Request, res: Response) => {
       data: (anomalies || []).map((a: any) => ({
         id: a.id,
         metricSlug: a.metric_slug,
-        direction: a.direction,
+        direction: a.direction === "spike" ? "up" : a.direction === "drop" ? "down" : a.direction,
         zScore: a.z_score,
         currentValue: a.current_value,
         baselineMean: a.baseline_mean,
-        baselineStdDev: a.baseline_std_dev,
+        baselineStdDev: a.baseline_stddev ?? a.baseline_std_dev ?? 0,
         severity: a.severity,
         detectedAt: a.detected_at,
       })),
@@ -141,17 +149,23 @@ anomaliesRouter.get("/api/alert-rules", async (req: Request, res: Response) => {
       throw new Error(`Database query failed: ${error.message}`);
     }
 
+    const mapCondition = (c: string) => {
+      if (c === "gt") return "exceeds";
+      if (c === "lt") return "below";
+      if (c === "change_pct") return "anomaly";
+      return c;
+    };
     res.json({
       success: true,
       data: (rules || []).map((r: any) => ({
         id: r.id,
-        name: r.name,
+        name: r.name ?? `${r.metric_slug} ${mapCondition(r.condition)} ${r.threshold}`,
         metricSlug: r.metric_slug,
-        condition: r.condition,
+        condition: mapCondition(r.condition ?? ""),
         threshold: r.threshold,
         severity: r.severity,
         isActive: r.is_active,
-        notificationChannels: r.notification_channels,
+        notificationChannels: r.notification_channels ?? [],
         createdAt: r.created_at,
       })),
     });
@@ -169,31 +183,36 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
     const clientId =
       (req.query.client_id as string) || DEFAULT_CLIENT_ID;
 
-    const { name, metricSlug, condition, threshold, severity, notificationChannels } =
-      req.body;
+    const { name, metricSlug, condition, threshold, severity } = req.body;
 
-    if (!name || !metricSlug || !condition || threshold === undefined) {
+    if (!metricSlug || !condition || threshold === undefined) {
       return res.status(400).json({
         error: "Invalid input",
-        message: "name, metricSlug, condition, and threshold are required",
+        message: "metricSlug, condition, and threshold are required",
       });
     }
 
+    if (!["exceeds", "below", "anomaly", "gt", "lt", "eq", "change_pct"].includes(condition)) {
+      return res.status(400).json({
+        error: "Invalid condition",
+        message: "Condition must be exceeds, below, anomaly, gt, lt, eq, or change_pct",
+      });
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      client_id: clientId,
+      metric_slug: metricSlug,
+      condition: mapConditionToSchema(condition),
+      threshold,
+      severity: severity || "warning",
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    if (name !== undefined) insertPayload.name = name;
+
     const { data: rule, error } = await supabase
       .from("alert_rules")
-      .insert([
-        {
-          client_id: clientId,
-          name,
-          metric_slug: metricSlug,
-          condition,
-          threshold,
-          severity: severity || "warning",
-          notification_channels: notificationChannels || [],
-          is_active: true,
-          created_at: new Date().toISOString(),
-        },
-      ])
+      .insert([insertPayload])
       .select()
       .single();
 
@@ -201,13 +220,19 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
       throw new Error(`Failed to create alert rule: ${error.message}`);
     }
 
+    const mapCondition = (c: string) => {
+      if (c === "gt") return "exceeds";
+      if (c === "lt") return "below";
+      if (c === "change_pct") return "anomaly";
+      return c;
+    };
     res.status(201).json({
       success: true,
       data: {
         id: rule.id,
-        name: rule.name,
+        name: rule.name ?? `${rule.metric_slug} ${mapCondition(rule.condition)} ${rule.threshold}`,
         metricSlug: rule.metric_slug,
-        condition: rule.condition,
+        condition: mapCondition(rule.condition ?? ""),
         threshold: rule.threshold,
         severity: rule.severity,
         isActive: rule.is_active,
@@ -231,13 +256,12 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
 
     const updates: Record<string, unknown> = {};
     if (req.body.name !== undefined) updates.name = req.body.name;
-    if (req.body.condition !== undefined) updates.condition = req.body.condition;
+    if (req.body.condition !== undefined) {
+      updates.condition = mapConditionToSchema(req.body.condition);
+    }
     if (req.body.threshold !== undefined) updates.threshold = req.body.threshold;
     if (req.body.severity !== undefined) updates.severity = req.body.severity;
     if (req.body.isActive !== undefined) updates.is_active = req.body.isActive;
-    if (req.body.notificationChannels !== undefined) {
-      updates.notification_channels = req.body.notificationChannels;
-    }
 
     const { data: rule, error } = await supabase
       .from("alert_rules")
@@ -257,13 +281,19 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
       throw new Error(`Failed to update alert rule: ${error.message}`);
     }
 
+    const mapCondition = (c: string) => {
+      if (c === "gt") return "exceeds";
+      if (c === "lt") return "below";
+      if (c === "change_pct") return "anomaly";
+      return c;
+    };
     res.json({
       success: true,
       data: {
         id: rule.id,
-        name: rule.name,
+        name: rule.name ?? `${rule.metric_slug} ${mapCondition(rule.condition)} ${rule.threshold}`,
         metricSlug: rule.metric_slug,
-        condition: rule.condition,
+        condition: mapCondition(rule.condition ?? ""),
         threshold: rule.threshold,
         severity: rule.severity,
         isActive: rule.is_active,
@@ -287,7 +317,7 @@ anomaliesRouter.delete("/api/alert-rules/:id", async (req: Request, res: Respons
 
     const { error } = await supabase
       .from("alert_rules")
-      .update({ deleted_at: new Date().toISOString() })
+      .delete()
       .eq("id", ruleId)
       .eq("client_id", clientId);
 

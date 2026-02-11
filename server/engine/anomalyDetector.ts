@@ -165,11 +165,11 @@ export class AnomalyDetector {
     const records = anomalies.map((a) => ({
       client_id: clientId,
       metric_slug: a.metricSlug,
-      direction: a.direction,
+      direction: a.direction === "up" ? "spike" : "drop",
       z_score: a.zScore,
       current_value: a.currentValue,
       baseline_mean: a.baselineMean,
-      baseline_std_dev: a.baselineStdDev,
+      baseline_stddev: a.baselineStdDev,
       severity: a.severity,
       detected_at: a.detectedAt.toISOString(),
     }));

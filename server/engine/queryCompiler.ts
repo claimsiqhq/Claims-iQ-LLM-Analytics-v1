@@ -1,6 +1,10 @@
 import type { ParsedIntent } from "../llm/intentParser";
 import type { MetricDefinition } from "./metricRegistry";
 import { supabase } from "../config/supabase";
+import {
+  ENHANCED_METRIC_QUERIES,
+  type QueryParams,
+} from "./queryCompiler-additions";
 
 interface QueryResult {
   data: any;
@@ -118,6 +122,36 @@ function getDimensionColumn(dim: string): string {
     decision_type: "cr.review_type",
   };
   return mapping[dim] || `c.${dim}`;
+}
+
+function intentToQueryParams(intent: ParsedIntent, clientId: string): QueryParams {
+  const now = new Date();
+  const defaultEnd = now.toISOString().split("T")[0];
+  const defaultStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+  const timeGrain =
+    intent.dimensions?.includes("month") ||
+    intent.time_range?.value?.includes("month")
+      ? "month"
+      : intent.dimensions?.includes("week") ||
+          intent.time_range?.value?.includes("week")
+        ? "week"
+        : "day";
+  const filters = (intent.filters || []).map((f) => ({
+    field: f.field,
+    operator: f.operator === "eq" ? "=" : f.operator === "neq" ? "!=" : f.operator,
+    value: String(Array.isArray(f.value) ? f.value[0] : f.value),
+  }));
+  return {
+    clientId,
+    startDate: intent.time_range?.start || defaultStart,
+    endDate: intent.time_range?.end || defaultEnd,
+    timeGrain,
+    filters,
+    dimensions: intent.dimensions || [],
+    limit: intent.limit ?? 1000,
+  };
 }
 
 const METRIC_QUERIES: Record<
@@ -355,6 +389,30 @@ const METRIC_QUERIES: Record<
     ].join(", ");
     return `SELECT DATE_TRUNC('${timeDim}', c.fnol_date) as dim_0, ${selectExtra}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.severity IN ('high', 'critical') GROUP BY ${groupBy} ORDER BY dim_0`;
   },
+
+  // Enhanced metrics (documentation, policy, financial)
+  photo_count_per_claim: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.photo_count_per_claim(intentToQueryParams(intent, clientId)).sql,
+  areas_documented: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.areas_documented(intentToQueryParams(intent, clientId)).sql,
+  damage_type_coverage: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.damage_type_coverage(intentToQueryParams(intent, clientId)).sql,
+  coverage_type_distribution: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.coverage_type_distribution(intentToQueryParams(intent, clientId)).sql,
+  endorsement_frequency: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.endorsement_frequency(intentToQueryParams(intent, clientId)).sql,
+  roof_coverage_rate: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.roof_coverage_rate(intentToQueryParams(intent, clientId)).sql,
+  estimate_accuracy: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.estimate_accuracy(intentToQueryParams(intent, clientId)).sql,
+  depreciation_ratio: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.depreciation_ratio(intentToQueryParams(intent, clientId)).sql,
+  net_claim_amount_trend: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.net_claim_amount_trend(intentToQueryParams(intent, clientId)).sql,
+  total_expenses_per_claim: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.total_expenses_per_claim(intentToQueryParams(intent, clientId)).sql,
+  expense_type_breakdown: (intent, clientId) =>
+    ENHANCED_METRIC_QUERIES.expense_type_breakdown(intentToQueryParams(intent, clientId)).sql,
 };
 
 export async function executeMetricQuery(
