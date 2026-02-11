@@ -1,0 +1,417 @@
+import type { ParsedIntent } from "../llm/intentParser";
+import type { MetricDefinition } from "./metricRegistry";
+import { supabase } from "../config/supabase";
+
+interface QueryResult {
+  data: any;
+  queryMs: number;
+  recordCount: number;
+}
+
+function buildWhereClause(
+  intent: ParsedIntent,
+  clientId: string
+): { conditions: string; params: any[] } {
+  const conditions: string[] = [`client_id = '${clientId}'`];
+  const params: any[] = [];
+
+  if (intent.time_range?.start && intent.time_range?.end) {
+    conditions.push(
+      `fnol_date >= '${intent.time_range.start}'`,
+      `fnol_date <= '${intent.time_range.end}'`
+    );
+  }
+
+  for (const filter of intent.filters || []) {
+    const col = mapFilterFieldToColumn(filter.field);
+    switch (filter.operator) {
+      case "eq":
+        conditions.push(`${col} = '${filter.value}'`);
+        break;
+      case "neq":
+        conditions.push(`${col} != '${filter.value}'`);
+        break;
+      case "gt":
+        conditions.push(`${col} > '${filter.value}'`);
+        break;
+      case "gte":
+        conditions.push(`${col} >= '${filter.value}'`);
+        break;
+      case "lt":
+        conditions.push(`${col} < '${filter.value}'`);
+        break;
+      case "lte":
+        conditions.push(`${col} <= '${filter.value}'`);
+        break;
+      case "in":
+        if (Array.isArray(filter.value)) {
+          const vals = filter.value.map((v) => `'${v}'`).join(", ");
+          conditions.push(`${col} IN (${vals})`);
+        }
+        break;
+      case "not_in":
+        if (Array.isArray(filter.value)) {
+          const vals = filter.value.map((v) => `'${v}'`).join(", ");
+          conditions.push(`${col} NOT IN (${vals})`);
+        }
+        break;
+    }
+  }
+
+  return { conditions: conditions.join(" AND "), params };
+}
+
+function mapFilterFieldToColumn(field: string): string {
+  const mapping: Record<string, string> = {
+    adjuster: "assigned_adjuster_id",
+    stage: "current_stage",
+    issue_type: "issue_types",
+  };
+  return mapping[field] || field;
+}
+
+function getDimensionColumn(dim: string): string {
+  const mapping: Record<string, string> = {
+    adjuster: "a.full_name",
+    peril: "c.peril",
+    region: "c.region",
+    severity: "c.severity",
+    stage: "c.current_stage",
+    status: "c.status",
+    team: "a.team",
+    model: "lu.model",
+    issue_type: "unnest(c.issue_types)",
+    day: "DATE_TRUNC('day', c.fnol_date)",
+    week: "DATE_TRUNC('week', c.fnol_date)",
+    month: "DATE_TRUNC('month', c.fnol_date)",
+    priority: "c.severity",
+    carrier: "cl.name",
+    decision_type: "cr.review_type",
+  };
+  return mapping[dim] || `c.${dim}`;
+}
+
+const METRIC_QUERIES: Record<
+  string,
+  (intent: ParsedIntent, clientId: string) => string
+> = {
+  claims_received: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY ${dimCols[0]}`
+      : "";
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id LEFT JOIN clients cl ON c.client_id = cl.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  claims_in_progress: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY ${dimCols[0]}`
+      : "";
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.status IN ('open', 'in_progress', 'review') ${groupBy}`;
+  },
+
+  queue_depth: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id LEFT JOIN clients cl ON c.client_id = cl.id WHERE c.client_id = '${clientId}' AND c.status IN ('open', 'in_progress') ${groupBy}`;
+  },
+
+  cycle_time_e2e: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}AVG(EXTRACT(EPOCH FROM (COALESCE(c.closed_at, NOW()) - c.fnol_date)) / 86400.0) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  stage_dwell_time: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims
+      .filter((d) => d !== "stage")
+      .map((d) => (d === "adjuster" ? "a.full_name" : `sh.${d}`));
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = ["sh.stage", ...dimCols].join(", ");
+    return `SELECT sh.stage as dim_0, ${selectDims}AVG(sh.dwell_days) as value FROM claim_stage_history sh JOIN claims c ON sh.claim_id = c.id LEFT JOIN adjusters a ON sh.adjuster_id = a.id WHERE c.client_id = '${clientId}' GROUP BY ${groupBy} ORDER BY value DESC`;
+  },
+
+  time_to_first_touch: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}AVG(EXTRACT(EPOCH FROM (c.first_touch_at - c.fnol_date)) / 3600.0) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.first_touch_at IS NOT NULL ${groupBy}`;
+  },
+
+  sla_breach_rate: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN c.sla_breached THEN 1.0 ELSE 0.0 END)::numeric, 4) as value, COUNT(*) as total FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  sla_breach_count: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.sla_breached = true ${groupBy}`;
+  },
+
+  issue_rate: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN c.has_issues THEN 1.0 ELSE 0.0 END)::numeric, 4) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  re_review_count: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims.map((d) =>
+      d === "adjuster" ? "a.full_name" : `cr.${d === "peril" ? "c.peril" : d}`
+    );
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}COUNT(*) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id LEFT JOIN adjusters a ON cr.reviewer_id = a.id WHERE c.client_id = '${clientId}' AND cr.review_type = 're_review' ${groupBy}`;
+  },
+
+  human_override_rate: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims.map((d) =>
+      d === "stage" ? "cr.review_type" : d === "decision_type" ? "cr.outcome" : `cr.${d}`
+    );
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN cr.human_override THEN 1.0 ELSE 0.0 END)::numeric, 4) as value FROM claim_reviews cr JOIN claims c ON cr.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+  },
+
+  tokens_per_claim: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims.map((d) =>
+      d === "model" ? "lu.model" : d === "stage" ? "lu.stage" : `lu.${d}`
+    );
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}AVG(lu.input_tokens + lu.output_tokens) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+  },
+
+  cost_per_claim: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map((d) =>
+      d === "model" ? "lu.model" : d === "stage" ? "lu.stage" : getDimensionColumn(d)
+    );
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}AVG(lu.cost_usd) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  model_mix: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const extraDims = dims
+      .filter((d) => d !== "model")
+      .map((d) => (d === "stage" ? "lu.stage" : `lu.${d}`));
+    const selectExtra = extraDims.length
+      ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", "
+      : "";
+    const groupBy = ["lu.model", ...extraDims].join(", ");
+    return `SELECT lu.model as dim_0, ${selectExtra}COUNT(*) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' GROUP BY ${groupBy} ORDER BY value DESC`;
+  },
+
+  llm_latency: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const dimCols = dims.map((d) =>
+      d === "model" ? "lu.model" : d === "stage" ? "lu.stage" : `lu.${d}`
+    );
+    const selectDims = dimCols.length
+      ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", "
+      : "";
+    const groupBy = dimCols.length
+      ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
+      : "";
+    return `SELECT ${selectDims}AVG(lu.latency_ms) as value FROM claim_llm_usage lu JOIN claims c ON lu.claim_id = c.id WHERE c.client_id = '${clientId}' ${groupBy}`;
+  },
+
+  severity_distribution: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const extraDims = dims
+      .filter((d) => d !== "severity")
+      .map(getDimensionColumn);
+    const selectExtra = extraDims.length
+      ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", "
+      : "";
+    const groupBy = ["c.severity", ...extraDims].join(", ");
+    return `SELECT c.severity as dim_0, ${selectExtra}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} GROUP BY ${groupBy} ORDER BY value DESC`;
+  },
+
+  high_severity_trend: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const timeDim = dims.includes("month")
+      ? "month"
+      : dims.includes("week")
+        ? "week"
+        : "month";
+    const extraDims = dims
+      .filter((d) => !["day", "week", "month"].includes(d))
+      .map(getDimensionColumn);
+    const selectExtra = extraDims.length
+      ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", "
+      : "";
+    const groupBy = [
+      `DATE_TRUNC('${timeDim}', c.fnol_date)`,
+      ...extraDims,
+    ].join(", ");
+    return `SELECT DATE_TRUNC('${timeDim}', c.fnol_date) as dim_0, ${selectExtra}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.severity IN ('high', 'critical') GROUP BY ${groupBy} ORDER BY dim_0`;
+  },
+};
+
+export async function executeMetricQuery(
+  intent: ParsedIntent,
+  metric: MetricDefinition,
+  clientId: string
+): Promise<QueryResult> {
+  const queryBuilder = METRIC_QUERIES[metric.slug];
+  if (!queryBuilder) {
+    throw new Error(`No query implementation for metric: ${metric.slug}`);
+  }
+
+  const sql = queryBuilder(intent, clientId);
+  const start = Date.now();
+  const { data, error } = await supabase.rpc("execute_raw_sql", {
+    query_text: sql,
+  });
+
+  if (error) {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("claims")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", clientId);
+
+    if (fallbackError) {
+      throw new Error(`Query failed: ${error.message}`);
+    }
+  }
+
+  const queryMs = Date.now() - start;
+
+  return {
+    data: data || [],
+    queryMs,
+    recordCount: Array.isArray(data) ? data.length : 0,
+  };
+}
+
+export function formatChartData(
+  rawData: any[],
+  intent: ParsedIntent,
+  metric: MetricDefinition
+): {
+  type: string;
+  data: { labels: string[]; datasets: Array<{ label: string; values: number[]; unit: string }> };
+  title: string;
+} {
+  const chartType = intent.chart_type || metric.default_chart_type;
+
+  const labels = rawData.map((row) => {
+    const dimKeys = Object.keys(row).filter((k) => k.startsWith("dim_"));
+    if (dimKeys.length === 0) return metric.display_name;
+    return dimKeys
+      .map((k) => {
+        const val = row[k];
+        if (val instanceof Date) return val.toISOString().split("T")[0];
+        return String(val ?? "Unknown");
+      })
+      .join(" / ");
+  });
+
+  const values = rawData.map((row) => {
+    const val = parseFloat(row.value);
+    if (metric.unit === "percentage") return Math.round(val * 10000) / 100;
+    return Math.round(val * 100) / 100;
+  });
+
+  const dims = intent.dimensions?.length
+    ? ` by ${intent.dimensions.join(", ")}`
+    : "";
+  const timeLabel = intent.time_range?.value
+    ? ` — ${intent.time_range.value.replace(/_/g, " ")}`
+    : "";
+
+  return {
+    type: chartType,
+    data: {
+      labels,
+      datasets: [
+        {
+          label: metric.display_name,
+          values,
+          unit: metric.unit || "count",
+        },
+      ],
+    },
+    title: `${metric.display_name}${dims}${timeLabel}`,
+  };
+}
