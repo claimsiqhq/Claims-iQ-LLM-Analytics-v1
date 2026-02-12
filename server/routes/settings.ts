@@ -32,7 +32,21 @@ const SEVERITY_MAP: Record<string, string> = {
   none: "low",
 };
 
-const STAGES = ["fnol", "investigation", "evaluation", "negotiation", "settlement", "closed"];
+const STAGES = [
+  "fnol_received",
+  "under_review",
+  "inspection_scheduled",
+  "inspection_complete",
+  "estimate_in_progress",
+  "estimate_review",
+  "supplement_review",
+  "approved",
+  "payment_pending",
+  "payment_issued",
+  "closed_settled",
+  "closed_denied",
+  "reopened",
+];
 
 function shiftDatesIntoLastNDays(rows: any[], days: number): void {
   const dateFields = ["date_of_loss", "fnol_date", "assigned_at", "first_touch_at", "closed_at"];
