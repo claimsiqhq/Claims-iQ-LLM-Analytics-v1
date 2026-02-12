@@ -540,6 +540,16 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
                 Online
               </p>
             </div>
+            {currentThreadId && (
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="p-2 hover:bg-white/50 rounded-lg text-text-secondary hover:text-brand-deep-purple transition-colors"
+                title="Share conversation"
+              >
+                <Share className="w-5 h-5" />
+              </button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="p-2 hover:bg-white/50 rounded-lg text-text-secondary">

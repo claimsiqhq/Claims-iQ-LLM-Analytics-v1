@@ -95,7 +95,8 @@ last_7_days, last_14_days, last_30_days, last_60_days, last_90_days, last_6_mont
 3. If the user doesn't specify a chart type, use the metric's default chart type
 4. Compute actual ISO dates for start/end based on today's date
 5. If the question is ambiguous, pick the most likely interpretation and note assumptions
-6. Today's date is ${new Date().toISOString().split("T")[0]}`;
+6. CRITICAL: When the user says "by X" or "by adjuster" or "by peril" etc., you MUST include that dimension in the dimensions array. Example: "SLA breach rate by adjuster" → dimensions: ["adjuster"]. "Claims by region" → dimensions: ["region"]. The dimension must be one of the metric's allowed_dimensions.
+7. Today's date is ${new Date().toISOString().split("T")[0]}`;
 }
 
 export async function parseIntent(
