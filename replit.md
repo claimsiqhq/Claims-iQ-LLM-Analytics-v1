@@ -52,7 +52,7 @@ The frontend has three main layout components:
 ### Settings Page
 
 - **Settings Page** (`client/src/pages/SettingsPage.tsx`): Full settings interface accessible via gear icon in ContextBar
-  - **Data Import**: Upload XLSX spreadsheets to add/replace claims data. Shows current data counts. Supports append (skip duplicates) and replace (purge + reimport) modes.
+  - **Data Import**: Upload XLSX spreadsheets as the master record. Every import fully purges and replaces all existing claims, adjusters, policies, estimates, billing, and stage history for the active client.
   - **App Preferences**: Theme selection (light/dark/system), default chart type, time range, notifications, auto-refresh interval
   - **Client & User Management**: View/add/delete client organizations, view adjusters imported from spreadsheet data
   - **AI Model Configuration**: View connected AI providers (Anthropic Claude, OpenAI), feature status, architecture overview

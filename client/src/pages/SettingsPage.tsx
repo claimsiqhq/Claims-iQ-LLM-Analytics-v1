@@ -147,7 +147,6 @@ function DataImportSection({ clientId }: { clientId?: string }) {
   const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [importMode, setImportMode] = useState<"append" | "replace">("append");
   const [importResult, setImportResult] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -183,7 +182,6 @@ function DataImportSection({ clientId }: { clientId?: string }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("mode", importMode);
       if (clientId) formData.append("client_id", clientId);
 
       const res = await fetch("/api/settings/import-spreadsheet", {
@@ -204,7 +202,7 @@ function DataImportSection({ clientId }: { clientId?: string }) {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [importMode, loadSummary]);
+  }, [loadSummary]);
 
   const summaryItems = dataSummary ? [
     { label: "Claims", value: dataSummary.claims, icon: FileSpreadsheet },
@@ -281,29 +279,12 @@ function DataImportSection({ clientId }: { clientId?: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="import-mode">Import Mode</Label>
-              <Select value={importMode} onValueChange={(v) => setImportMode(v as "append" | "replace")}>
-                <SelectTrigger id="import-mode" data-testid="select-import-mode">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="append">Append (add new records only)</SelectItem>
-                  <SelectItem value="replace">Replace (delete all existing, then import)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex items-start gap-2 p-3 bg-brand-purple/10 border border-brand-purple/20 rounded-lg">
+            <AlertCircle className="w-4 h-4 text-brand-purple mt-0.5 shrink-0" />
+            <p className="text-sm text-brand-deep-purple dark:text-white/80">
+              The spreadsheet is the master record. Importing will replace ALL existing claims, adjusters, policies, estimates, billing, and stage history for the current client.
+            </p>
           </div>
-
-          {importMode === "replace" && (
-            <div className="flex items-start gap-2 p-3 bg-status-alert/10 border border-status-alert/20 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-status-alert mt-0.5 shrink-0" />
-              <p className="text-sm text-status-alert">
-                Replace mode will delete ALL existing claims, adjusters, and related data for the current client before importing. This cannot be undone.
-              </p>
-            </div>
-          )}
 
           <div
             className="border-2 border-dashed border-brand-purple/30 dark:border-brand-purple/50 rounded-xl p-8 text-center hover:border-brand-purple/60 transition-colors cursor-pointer"

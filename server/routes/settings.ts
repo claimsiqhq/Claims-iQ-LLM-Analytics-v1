@@ -42,13 +42,12 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     }
 
     const clientId = (req.body.client_id as string) || (req.query.client_id as string) || await getDefaultClientId();
-    const mode = (req.body.mode as string) || "append";
 
     const sb = getSupabaseClient();
     const wb = XLSX.readFile(file.path);
 
     const sheetNames = wb.SheetNames as string[];
-    const result: any = { sheetsFound: sheetNames, imported: {} };
+    const result: any = { sheetsFound: sheetNames, imported: {}, purged: {} };
 
     const claimsSheet = wb.Sheets["claims"] ? XLSX.utils.sheet_to_json(wb.Sheets["claims"]) as any[] : [];
     const adjustersSheet = wb.Sheets["adjusters"] ? XLSX.utils.sheet_to_json(wb.Sheets["adjusters"]) as any[] : [];
@@ -56,38 +55,29 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     const estimatesSheet = wb.Sheets["claim_estimates"] ? XLSX.utils.sheet_to_json(wb.Sheets["claim_estimates"]) as any[] : [];
     const billingSheet = wb.Sheets["claim_billing"] ? XLSX.utils.sheet_to_json(wb.Sheets["claim_billing"]) as any[] : [];
 
-    if (mode === "replace") {
-      const { data: oldClaims } = await sb.from("claims").select("id").eq("client_id", clientId);
-      if (oldClaims?.length) {
-        const ids = oldClaims.map((c: any) => c.id);
-        for (let i = 0; i < ids.length; i += 100) {
-          const batch = ids.slice(i, i + 100);
-          await sb.from("claim_llm_usage").delete().in("claim_id", batch);
-          await sb.from("claim_reviews").delete().in("claim_id", batch);
-          await sb.from("claim_stage_history").delete().in("claim_id", batch);
-          await sb.from("claim_policies").delete().in("claim_id", batch);
-          await sb.from("claim_estimates").delete().in("claim_id", batch);
-          await sb.from("claim_billing").delete().in("claim_id", batch);
-        }
-        await sb.from("claims").delete().eq("client_id", clientId);
+    const { data: oldClaims } = await sb.from("claims").select("id").eq("client_id", clientId);
+    if (oldClaims?.length) {
+      const ids = oldClaims.map((c: any) => c.id);
+      for (let i = 0; i < ids.length; i += 100) {
+        const batch = ids.slice(i, i + 100);
+        await sb.from("claim_llm_usage").delete().in("claim_id", batch);
+        await sb.from("claim_reviews").delete().in("claim_id", batch);
+        await sb.from("claim_stage_history").delete().in("claim_id", batch);
+        await sb.from("claim_policies").delete().in("claim_id", batch);
+        await sb.from("claim_estimates").delete().in("claim_id", batch);
+        await sb.from("claim_billing").delete().in("claim_id", batch);
       }
-      await sb.from("adjusters").delete().eq("client_id", clientId);
+      await sb.from("claims").delete().eq("client_id", clientId);
+      result.purged.claims = oldClaims.length;
     }
+    await sb.from("adjusters").delete().eq("client_id", clientId);
+    result.purged.adjusters = true;
 
     const adjusterIdMap: Record<string, string> = {};
     if (adjustersSheet.length > 0) {
-      const { data: existingAdj } = await sb.from("adjusters").select("id, full_name").eq("client_id", clientId);
-      const existingMap = new Map((existingAdj || []).map((a: any) => [a.full_name, a.id]));
-
       for (let i = 0; i < adjustersSheet.length; i++) {
         const adj = adjustersSheet[i];
         const adjCode = `ADJ-${String(i + 1).padStart(3, "0")}`;
-
-        if (existingMap.has(adj.full_name)) {
-          adjusterIdMap[adjCode] = existingMap.get(adj.full_name)!;
-          continue;
-        }
-
         const { data: inserted, error } = await sb
           .from("adjusters")
           .insert({ client_id: clientId, full_name: adj.full_name, email: adj.email, team: adj.team })
@@ -101,64 +91,57 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     }
 
     if (claimsSheet.length > 0) {
-      const { data: existingClaims } = await sb.from("claims").select("claim_number").eq("client_id", clientId);
-      const existingClaimNumbers = new Set((existingClaims || []).map((c: any) => c.claim_number));
-
       const now = new Date();
-      const newClaims = claimsSheet
-        .filter((row: any) => !existingClaimNumbers.has(row.claim_number))
-        .map((row: any) => {
-          const adjUuid = adjusterIdMap[row.assigned_adjuster_id] || null;
-          let status = row.status || "open";
-          if (status === "closed_no_payment") status = "closed";
-          if (status === "denied") status = "closed";
-          const rawSeverity = (row.severity || "").toLowerCase();
-          const severity = SEVERITY_MAP[rawSeverity] || "medium";
-          const peril = row.peril || "Other";
-          const fnolDate = row.fnol_date ? new Date(row.fnol_date).toISOString() : (row.date_of_loss ? new Date(row.date_of_loss).toISOString() : now.toISOString());
-          const assignedAt = row.assigned_at ? new Date(row.assigned_at).toISOString() : fnolDate;
-          const firstTouchAt = row.first_touch_at ? new Date(row.first_touch_at).toISOString() : fnolDate;
+      const allNewClaims = claimsSheet.map((row: any) => {
+        const adjUuid = adjusterIdMap[row.assigned_adjuster_id] || null;
+        let status = row.status || "open";
+        if (status === "closed_no_payment") status = "closed";
+        if (status === "denied") status = "closed";
+        const rawSeverity = (row.severity || "").toLowerCase();
+        const severity = SEVERITY_MAP[rawSeverity] || "medium";
+        const peril = row.peril || "Other";
+        const fnolDate = row.fnol_date ? new Date(row.fnol_date).toISOString() : (row.date_of_loss ? new Date(row.date_of_loss).toISOString() : now.toISOString());
+        const assignedAt = row.assigned_at ? new Date(row.assigned_at).toISOString() : fnolDate;
+        const firstTouchAt = row.first_touch_at ? new Date(row.first_touch_at).toISOString() : fnolDate;
 
-          return {
-            client_id: clientId,
-            claim_number: row.claim_number,
-            claimant_name: row.claimant_name || "REDACTED",
-            peril,
-            severity,
-            region: row.region || "Unknown",
-            state_code: row.state_code || "XX",
-            status,
-            current_stage: row.current_stage || "fnol",
-            assigned_adjuster_id: adjUuid,
-            assigned_at: assignedAt,
-            fnol_date: fnolDate,
-            first_touch_at: firstTouchAt,
-            closed_at: row.closed_at ? new Date(row.closed_at).toISOString() : null,
-            reserve_amount: row.reserve_amount ?? 0,
-            paid_amount: row.paid_amount ?? 0,
-            sla_target_days: row.sla_target_days ?? 30,
-            sla_breached: row.sla_breached ?? false,
-            has_issues: row.has_issues ?? false,
-            issue_types: [],
-            reopen_count: row.reopen_count ?? 0,
-          };
-        });
+        return {
+          client_id: clientId,
+          claim_number: row.claim_number,
+          claimant_name: row.claimant_name || "REDACTED",
+          peril,
+          severity,
+          region: row.region || "Unknown",
+          state_code: row.state_code || "XX",
+          status,
+          current_stage: row.current_stage || "fnol",
+          assigned_adjuster_id: adjUuid,
+          assigned_at: assignedAt,
+          fnol_date: fnolDate,
+          first_touch_at: firstTouchAt,
+          closed_at: row.closed_at ? new Date(row.closed_at).toISOString() : null,
+          reserve_amount: row.reserve_amount ?? 0,
+          paid_amount: row.paid_amount ?? 0,
+          sla_target_days: row.sla_target_days ?? 30,
+          sla_breached: row.sla_breached ?? false,
+          has_issues: row.has_issues ?? false,
+          issue_types: [],
+          reopen_count: row.reopen_count ?? 0,
+        };
+      });
 
       let claimsInserted = 0;
-      for (let i = 0; i < newClaims.length; i += 25) {
-        const batch = newClaims.slice(i, i + 25);
+      for (let i = 0; i < allNewClaims.length; i += 25) {
+        const batch = allNewClaims.slice(i, i + 25);
         const { error } = await sb.from("claims").insert(batch);
         if (!error) claimsInserted += batch.length;
       }
       result.imported.claims = claimsInserted;
-      result.imported.claimsSkipped = claimsSheet.length - newClaims.length;
 
       const { data: allClaims } = await sb.from("claims").select("id, claim_number").eq("client_id", clientId);
       const claimMap = new Map<string, string>((allClaims || []).map((c: any) => [c.claim_number, c.id]));
 
       const stageHistory: any[] = [];
       for (const row of claimsSheet) {
-        if (existingClaimNumbers.has(row.claim_number)) continue;
         const claimUuid = claimMap.get(row.claim_number);
         if (!claimUuid) continue;
         const stageIdx = STAGES.indexOf(row.current_stage || "fnol");
@@ -195,7 +178,6 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
 
       if (policiesSheet.length > 0) {
         const polToInsert = policiesSheet
-          .filter((row: any) => !existingClaimNumbers.has(row.claim_id))
           .map((row: any) => {
             const claimUuid = claimMap.get(row.claim_id);
             if (!claimUuid) return null;
@@ -230,7 +212,6 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
 
       if (estimatesSheet.length > 0) {
         const estToInsert = estimatesSheet
-          .filter((row: any) => !existingClaimNumbers.has(row.claim_id))
           .map((row: any) => {
             const claimUuid = claimMap.get(row.claim_id);
             if (!claimUuid) return null;
@@ -256,7 +237,6 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
 
       if (billingSheet.length > 0) {
         const bilToInsert = billingSheet
-          .filter((row: any) => !existingClaimNumbers.has(row.claim_id))
           .map((row: any) => {
             const claimUuid = claimMap.get(row.claim_id);
             if (!claimUuid) return null;
@@ -281,26 +261,9 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       }
     }
 
-    const { data: allAdj } = await sb.from("adjusters").select("id").eq("client_id", clientId);
-    if (allAdj?.length) {
-      const { data: referencedAdj } = await sb
-        .from("claims")
-        .select("assigned_adjuster_id")
-        .eq("client_id", clientId)
-        .not("assigned_adjuster_id", "is", null);
-      const referencedIds = new Set((referencedAdj || []).map((c: any) => c.assigned_adjuster_id));
-      const orphanedIds = allAdj.filter((a: any) => !referencedIds.has(a.id)).map((a: any) => a.id);
-      if (orphanedIds.length > 0) {
-        for (let i = 0; i < orphanedIds.length; i += 100) {
-          await sb.from("adjusters").delete().in("id", orphanedIds.slice(i, i + 100));
-        }
-        result.imported.adjustersRemoved = orphanedIds.length;
-      }
-    }
-
     res.json({
       status: "ok",
-      message: mode === "replace" ? "Data replaced successfully" : "New data appended successfully",
+      message: "Spreadsheet imported — all existing data replaced with spreadsheet contents",
       ...result,
     });
   } catch (err: any) {
