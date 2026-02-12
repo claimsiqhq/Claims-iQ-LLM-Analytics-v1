@@ -58,6 +58,14 @@ The frontend has three main layout components:
 - **Insight Generator** (`server/llm/insightGenerator.ts`): Generates concise analytical summaries from chart data
 - **Batch Processing** (`server/replit_integrations/batch/`): Rate-limited batch processing utilities with retry logic
 
+### Voice Agent (OpenAI Realtime API)
+
+- **Voice Token Endpoint** (`server/routes/voice.ts`): `POST /api/voice/token` — creates ephemeral session tokens for WebRTC connections using OpenAI's Realtime API. Configured with `gpt-4o-realtime-preview` model, server-side VAD, Whisper transcription, and function calling tool.
+- **VoiceAgent Component** (`client/src/components/VoiceAgent.tsx`): WebRTC-based two-way voice chat. Manages RTCPeerConnection, data channel events, mic permissions, and audio playback. Supports function calling — when user asks about claims data, the AI calls `ask_claims_question` which hits `/api/ask` and displays charts on Canvas.
+- **Flow**: User speaks → Whisper transcribes → AI processes → function call to `/api/ask` if data question → chart appears on Canvas + AI speaks insight summary
+- **Security**: `OPENAI_API_KEY` stored as secret, ephemeral keys generated server-side with short TTL, never exposed to browser
+- **UI**: Expandable floating panel with status indicators (connecting, listening, speaking), transcript display, connect/disconnect controls
+
 ### Query Engine
 
 - **Metric Registry** (`server/engine/metricRegistry.ts`): Loads and caches metric definitions from Supabase with 5-min TTL
@@ -115,6 +123,7 @@ The frontend has three main layout components:
 | Supabase | `SUPABASE_SERVICE_KEY` | Service-role authentication key |
 | Anthropic Claude | `AI_INTEGRATIONS_ANTHROPIC_API_KEY` | LLM for intent parsing and insight generation |
 | Anthropic Claude | `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` | Anthropic API base URL (Replit integration) |
+| OpenAI | `OPENAI_API_KEY` | Realtime API for voice chat (WebRTC) |
 | PostgreSQL | `DATABASE_URL` | Used by Drizzle ORM for schema management |
 
 ### Key NPM Dependencies

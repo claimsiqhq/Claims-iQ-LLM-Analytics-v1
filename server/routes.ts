@@ -12,6 +12,7 @@ import { scheduledReportsRouter } from "./routes/scheduled-reports";
 import { dashboardsRouter } from "./routes/dashboards";
 import { importRouter } from "./routes/import";
 import { apiKeysRouter } from "./routes/api-keys";
+import { voiceRouter } from "./routes/voice";
 import { getMetrics } from "./engine/metricRegistry";
 import { parseIntent } from "./llm/intentParser";
 import { validateIntent } from "./engine/validator";
@@ -53,6 +54,7 @@ export async function registerRoutes(
   app.use(dashboardsRouter);
   app.use(apiKeysRouter);
   app.use(importRouter);
+  app.use(voiceRouter);
 
   app.get("/api/health", async (_req, res) => {
     try {

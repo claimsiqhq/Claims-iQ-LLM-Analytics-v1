@@ -8,6 +8,7 @@ import { KPICards } from "@/components/KPICards";
 import { Toaster } from "@/components/ui/toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MessageCircle } from 'lucide-react';
+import { VoiceAgent } from "@/components/VoiceAgent";
 
 export interface ChartResponse {
   thread_id: string;
@@ -223,6 +224,12 @@ function App() {
             <MessageCircle className="w-6 h-6" />
           </button>
         )}
+
+        <VoiceAgent
+          clientId={selectedClientId}
+          onNewResponse={handleNewResponse}
+          isMobile={isMobile}
+        />
 
         <Toaster />
       </div>
