@@ -193,7 +193,7 @@ const METRIC_QUERIES: Record<
     const groupBy = dimCols.length
       ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC`
       : "";
-    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id LEFT JOIN clients cl ON c.client_id = cl.id WHERE c.client_id = '${sanitize(clientId)}' AND c.status IN ('open', 'in_progress') ${groupBy}`;
+    return `SELECT ${selectDims}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id LEFT JOIN clients cl ON c.client_id = cl.id WHERE c.client_id = '${sanitize(clientId)}' AND c.status IN ('open', 'in_progress', 'review') ${groupBy}`;
   },
 
   cycle_time_e2e: (intent, clientId) => {

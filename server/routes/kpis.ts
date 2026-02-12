@@ -19,7 +19,7 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${clientId.replace(/'/g, "''")}'
-            AND c.status IN ('open', 'in_progress')
+            AND c.status IN ('open', 'in_progress', 'review')
         `,
       }),
       supabase.rpc("execute_raw_sql", {

@@ -105,7 +105,7 @@ export class MorningBriefGenerator {
       .from("claims")
       .select("id")
       .eq("client_id", clientId)
-      .in("status", ["open", "in_progress"]);
+      .in("status", ["open", "in_progress", "review"]);
 
     const queueDepth = openClaims?.length || 0;
 
@@ -143,7 +143,7 @@ export class MorningBriefGenerator {
       .from("claims")
       .select("id, claim_number, severity, sla_target_days, fnol_date")
       .eq("client_id", clientId)
-      .in("status", ["open", "in_progress"])
+      .in("status", ["open", "in_progress", "review"])
       .order("fnol_date", { ascending: true })
       .limit(5);
 

@@ -55,8 +55,8 @@ function generateClaims(count: number, clientId: string, adjusterIds: string[]):
     const severity = randomChoice(SEVERITIES);
     const fnol_date = randomDate(yearAgo, now);
     const isClosed = Math.random() < 0.55;
-    const status = isClosed ? "closed" : randomChoice(["open", "in_progress"] as const);
-    const stageIdx = isClosed ? STAGES.length - 1 : randomInt(0, STAGES.length - 2);
+    const status = isClosed ? "closed" : randomChoice(["open", "in_progress", "review"] as const);
+    const stageIdx = isClosed ? STAGES.length - 1 : status === "review" ? Math.max(2, randomInt(2, STAGES.length - 2)) : randomInt(0, STAGES.length - 2);
     const current_stage = STAGES[stageIdx];
     const sla_target_days = severity === "critical" ? 14 : severity === "high" ? 21 : severity === "medium" ? 30 : 45;
     const daysOpen = (now.getTime() - fnol_date.getTime()) / 86400000;
