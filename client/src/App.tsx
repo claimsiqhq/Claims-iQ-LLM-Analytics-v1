@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MessageCircle } from 'lucide-react';
 import { VoiceAgent } from "@/components/VoiceAgent";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 export interface ChartResponse {
   thread_id: string;
@@ -51,6 +52,7 @@ function App() {
   const [chartPanels, setChartPanels] = useState<ChartResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [showSettings, setShowSettings] = useState(false);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [questionToSubmit, setQuestionToSubmit] = useState<string | null>(null);
@@ -131,12 +133,24 @@ function App() {
     }
   }, [currentResponse?.turn_id]);
 
+  if (showSettings) {
+    return (
+      <ErrorBoundary>
+        <div className="min-h-screen bg-surface-off-white dark:bg-gray-900 font-body text-brand-deep-purple dark:text-gray-100 selection:bg-brand-purple-light">
+          <SettingsPage onBack={() => setShowSettings(false)} clientId={selectedClientId} />
+          <Toaster />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-surface-off-white dark:bg-gray-900 font-body text-brand-deep-purple dark:text-gray-100 selection:bg-brand-purple-light overflow-hidden">
         <ContextBar
           clientId={selectedClientId}
           onClientChange={setSelectedClientId}
+          onSettingsClick={() => setShowSettings(true)}
         />
         <div className="flex h-screen overflow-hidden">
           {isMobile ? (

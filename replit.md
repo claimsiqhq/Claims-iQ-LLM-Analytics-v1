@@ -49,6 +49,15 @@ The frontend has three main layout components:
   - `GET /api/health` — health check
   - `POST /api/seed` — seed the database with sample data
 
+### Settings Page
+
+- **Settings Page** (`client/src/pages/SettingsPage.tsx`): Full settings interface accessible via gear icon in ContextBar
+  - **Data Import**: Upload XLSX spreadsheets to add/replace claims data. Shows current data counts. Supports append (skip duplicates) and replace (purge + reimport) modes.
+  - **App Preferences**: Theme selection (light/dark/system), default chart type, time range, notifications, auto-refresh interval
+  - **Client & User Management**: View/add/delete client organizations, view adjusters imported from spreadsheet data
+  - **AI Model Configuration**: View connected AI providers (Anthropic Claude, OpenAI), feature status, architecture overview
+- **Settings Routes** (`server/routes/settings.ts`): Backend endpoints for import, data-summary, clients CRUD, adjusters list, AI config, preferences
+
 ### LLM Integration (Intent Translation Architecture)
 
 **Critical design decision:** The LLM is strictly an **intent translator**, not a query generator. It produces structured JSON; the backend validates and compiles queries. This is a hard architectural boundary.

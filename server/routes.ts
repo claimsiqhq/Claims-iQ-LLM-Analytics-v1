@@ -13,6 +13,7 @@ import { dashboardsRouter } from "./routes/dashboards";
 import { importRouter } from "./routes/import";
 import { apiKeysRouter } from "./routes/api-keys";
 import { voiceRouter } from "./routes/voice";
+import { settingsRouter } from "./routes/settings";
 import { getMetrics } from "./engine/metricRegistry";
 import { parseIntent } from "./llm/intentParser";
 import { validateIntent } from "./engine/validator";
@@ -56,6 +57,7 @@ export async function registerRoutes(
   app.use(apiKeysRouter);
   app.use(importRouter);
   app.use(voiceRouter);
+  app.use(settingsRouter);
 
   app.get("/api/health", async (_req, res) => {
     try {
