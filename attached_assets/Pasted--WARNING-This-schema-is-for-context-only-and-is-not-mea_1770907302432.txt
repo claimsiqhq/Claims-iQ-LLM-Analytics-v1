@@ -1,0 +1,449 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.adjusters (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  full_name text NOT NULL,
+  email text,
+  team text,
+  active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  adjuster_number text,
+  adjuster_type text CHECK (adjuster_type = ANY (ARRAY['field'::text, 'desk'::text, 'qa'::text, 'supervisor'::text])),
+  company text,
+  CONSTRAINT adjusters_pkey PRIMARY KEY (id),
+  CONSTRAINT adjusters_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.alert_rules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  metric_slug text NOT NULL,
+  condition text NOT NULL CHECK (condition = ANY (ARRAY['gt'::text, 'lt'::text, 'eq'::text, 'change_pct'::text])),
+  threshold numeric NOT NULL,
+  severity text NOT NULL CHECK (severity = ANY (ARRAY['info'::text, 'warning'::text, 'critical'::text])),
+  is_active boolean DEFAULT true,
+  last_triggered_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  webhook_url text,
+  CONSTRAINT alert_rules_pkey PRIMARY KEY (id),
+  CONSTRAINT alert_rules_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT alert_rules_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT alert_rules_metric_slug_fkey FOREIGN KEY (metric_slug) REFERENCES public.metric_definitions(slug)
+);
+CREATE TABLE public.anomaly_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  metric_slug text NOT NULL,
+  detected_at timestamp with time zone NOT NULL,
+  direction text NOT NULL CHECK (direction = ANY (ARRAY['spike'::text, 'drop'::text])),
+  z_score numeric NOT NULL,
+  current_value numeric NOT NULL,
+  baseline_mean numeric NOT NULL,
+  baseline_stddev numeric NOT NULL,
+  severity text NOT NULL CHECK (severity = ANY (ARRAY['info'::text, 'warning'::text, 'critical'::text])),
+  dismissed boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT anomaly_events_pkey PRIMARY KEY (id),
+  CONSTRAINT anomaly_events_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT anomaly_events_metric_slug_fkey FOREIGN KEY (metric_slug) REFERENCES public.metric_definitions(slug)
+);
+CREATE TABLE public.api_keys (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  key_hash text NOT NULL,
+  key_prefix text NOT NULL,
+  name text,
+  last_used_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT api_keys_pkey PRIMARY KEY (id),
+  CONSTRAINT api_keys_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.claim_billing (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  billing_type text NOT NULL,
+  expense_category text,
+  amount numeric NOT NULL,
+  description text,
+  vendor_name text,
+  invoice_number text,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_billing_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_billing_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id),
+  CONSTRAINT claim_billing_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.claim_estimates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  estimate_number text NOT NULL,
+  estimate_version integer NOT NULL DEFAULT 1,
+  estimated_amount numeric NOT NULL,
+  depreciation_amount numeric,
+  replacement_cost numeric,
+  line_items jsonb,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_estimates_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_estimates_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id),
+  CONSTRAINT claim_estimates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.claim_llm_usage (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  model text NOT NULL,
+  stage text NOT NULL,
+  input_tokens integer NOT NULL,
+  output_tokens integer NOT NULL,
+  cost_usd numeric,
+  latency_ms integer,
+  called_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_llm_usage_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_llm_usage_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id)
+);
+CREATE TABLE public.claim_photos (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  photo_url text NOT NULL,
+  photo_category text NOT NULL,
+  area_documented text,
+  damage_type text,
+  damage_severity text CHECK (damage_severity = ANY (ARRAY['minor'::text, 'moderate'::text, 'severe'::text])),
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_photos_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_photos_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id),
+  CONSTRAINT claim_photos_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.claim_policies (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  policy_number text NOT NULL,
+  policy_type text NOT NULL,
+  coverage_type text NOT NULL,
+  coverage_amount numeric,
+  deductible numeric,
+  endorsements ARRAY,
+  roof_replacement_included boolean,
+  replacement_cost_value numeric,
+  actual_cash_value numeric,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_policies_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_policies_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id)
+);
+CREATE TABLE public.claim_reviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  review_type text NOT NULL,
+  reviewer_id uuid,
+  outcome text,
+  llm_decision text,
+  human_override boolean DEFAULT false,
+  override_reason text,
+  reviewed_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT claim_reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_reviews_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id),
+  CONSTRAINT claim_reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.adjusters(id)
+);
+CREATE TABLE public.claim_stage_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claim_id uuid NOT NULL,
+  stage text NOT NULL,
+  entered_at timestamp with time zone NOT NULL,
+  exited_at timestamp with time zone,
+  adjuster_id uuid,
+  dwell_days numeric,
+  CONSTRAINT claim_stage_history_pkey PRIMARY KEY (id),
+  CONSTRAINT claim_stage_history_claim_id_fkey FOREIGN KEY (claim_id) REFERENCES public.claims(id),
+  CONSTRAINT claim_stage_history_adjuster_id_fkey FOREIGN KEY (adjuster_id) REFERENCES public.adjusters(id)
+);
+CREATE TABLE public.claims (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  claim_number text NOT NULL,
+  claimant_name text,
+  peril text NOT NULL,
+  severity text NOT NULL CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])),
+  region text,
+  state_code text,
+  status text NOT NULL CHECK (status = ANY (ARRAY['open'::text, 'in_progress'::text, 'review'::text, 'closed'::text, 'reopened'::text])),
+  current_stage text NOT NULL,
+  assigned_adjuster_id uuid,
+  assigned_at timestamp with time zone,
+  fnol_date timestamp with time zone NOT NULL,
+  first_touch_at timestamp with time zone,
+  closed_at timestamp with time zone,
+  reserve_amount numeric,
+  paid_amount numeric,
+  sla_target_days integer,
+  sla_breached boolean DEFAULT false,
+  has_issues boolean DEFAULT false,
+  issue_types ARRAY,
+  reopen_count integer DEFAULT 0,
+  source_document_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  cat_code text,
+  date_of_loss date,
+  property_year_built integer,
+  roof_install_year integer,
+  stories integer,
+  wood_roof boolean DEFAULT false,
+  description text,
+  CONSTRAINT claims_pkey PRIMARY KEY (id),
+  CONSTRAINT claims_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT claims_assigned_adjuster_id_fkey FOREIGN KEY (assigned_adjuster_id) REFERENCES public.adjusters(id)
+);
+CREATE TABLE public.clients (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  slug text NOT NULL UNIQUE,
+  config jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT clients_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.ingestion_jobs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  document_name text NOT NULL,
+  document_size integer,
+  status text NOT NULL DEFAULT 'processing'::text CHECK (status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text])),
+  started_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  extraction_results jsonb,
+  error_message text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ingestion_jobs_pkey PRIMARY KEY (id),
+  CONSTRAINT ingestion_jobs_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.metric_definitions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  slug text NOT NULL UNIQUE,
+  display_name text NOT NULL,
+  category text NOT NULL CHECK (category = ANY (ARRAY['throughput'::text, 'speed_sla'::text, 'quality'::text, 'cost_llm'::text, 'risk'::text, 'documentation'::text, 'policy'::text, 'financial'::text])),
+  description text NOT NULL,
+  calculation text NOT NULL,
+  unit text,
+  default_chart_type text NOT NULL,
+  allowed_dimensions ARRAY NOT NULL,
+  allowed_time_grains ARRAY DEFAULT ARRAY['day'::text, 'week'::text, 'month'::text],
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT metric_definitions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.morning_briefs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  brief_date date NOT NULL,
+  content text NOT NULL,
+  metrics_snapshot jsonb,
+  anomaly_count integer DEFAULT 0,
+  generated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT morning_briefs_pkey PRIMARY KEY (id),
+  CONSTRAINT morning_briefs_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT morning_briefs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.query_cache (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  cache_key text NOT NULL UNIQUE,
+  metric_slug text,
+  client_id uuid NOT NULL,
+  query_hash text NOT NULL,
+  result_data jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL,
+  hit_count integer DEFAULT 0,
+  CONSTRAINT query_cache_pkey PRIMARY KEY (id),
+  CONSTRAINT query_cache_metric_slug_fkey FOREIGN KEY (metric_slug) REFERENCES public.metric_definitions(slug),
+  CONSTRAINT query_cache_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.saved_dashboards (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  user_id uuid,
+  title text NOT NULL,
+  layout jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saved_dashboards_pkey PRIMARY KEY (id),
+  CONSTRAINT saved_dashboards_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT saved_dashboards_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.scheduled_metric_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  user_id uuid,
+  title text NOT NULL,
+  metric_slug text NOT NULL,
+  schedule_cron text NOT NULL,
+  recipients jsonb DEFAULT '[]'::jsonb,
+  last_run_at timestamp with time zone,
+  next_run_at timestamp with time zone,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scheduled_metric_reports_pkey PRIMARY KEY (id),
+  CONSTRAINT scheduled_metric_reports_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT scheduled_metric_reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.scheduled_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  thread_id uuid NOT NULL,
+  schedule text NOT NULL CHECK (schedule = ANY (ARRAY['daily'::text, 'weekly'::text, 'monthly'::text])),
+  delivery text NOT NULL CHECK (delivery = ANY (ARRAY['email'::text, 'slack'::text])),
+  recipients ARRAY NOT NULL,
+  last_run_at timestamp with time zone,
+  next_run_at timestamp with time zone NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scheduled_reports_pkey PRIMARY KEY (id),
+  CONSTRAINT scheduled_reports_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT scheduled_reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT scheduled_reports_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id)
+);
+CREATE TABLE public.sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  client_id uuid NOT NULL,
+  started_at timestamp with time zone DEFAULT now(),
+  last_active_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT sessions_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.source_documents (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  filename text NOT NULL,
+  file_path text,
+  document_type text,
+  page_count integer,
+  parsed_at timestamp with time zone,
+  parse_status text DEFAULT 'pending'::text CHECK (parse_status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])),
+  parse_errors jsonb,
+  uploaded_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT source_documents_pkey PRIMARY KEY (id),
+  CONSTRAINT source_documents_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.thread_annotations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  turn_id uuid NOT NULL,
+  annotation_text text NOT NULL,
+  data_point_ref jsonb,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT thread_annotations_pkey PRIMARY KEY (id),
+  CONSTRAINT thread_annotations_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id),
+  CONSTRAINT thread_annotations_turn_id_fkey FOREIGN KEY (turn_id) REFERENCES public.thread_turns(id),
+  CONSTRAINT thread_annotations_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.thread_notes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  turn_id uuid,
+  user_id uuid,
+  note text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT thread_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT thread_notes_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id),
+  CONSTRAINT thread_notes_turn_id_fkey FOREIGN KEY (turn_id) REFERENCES public.thread_turns(id),
+  CONSTRAINT thread_notes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.thread_share_links (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  share_token text NOT NULL UNIQUE,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  CONSTRAINT thread_share_links_pkey PRIMARY KEY (id),
+  CONSTRAINT thread_share_links_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id),
+  CONSTRAINT thread_share_links_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.thread_shares (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  shared_by uuid NOT NULL,
+  shared_with uuid NOT NULL,
+  permission text NOT NULL CHECK (permission = ANY (ARRAY['view'::text, 'comment'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT thread_shares_pkey PRIMARY KEY (id),
+  CONSTRAINT thread_shares_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id),
+  CONSTRAINT thread_shares_shared_by_fkey FOREIGN KEY (shared_by) REFERENCES public.users(id),
+  CONSTRAINT thread_shares_shared_with_fkey FOREIGN KEY (shared_with) REFERENCES public.users(id)
+);
+CREATE TABLE public.thread_turns (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  turn_index integer NOT NULL,
+  user_message text NOT NULL,
+  parsed_intent jsonb,
+  intent_valid boolean,
+  validation_errors jsonb,
+  assumptions jsonb,
+  context_stack jsonb,
+  chart_data jsonb,
+  chart_type text,
+  insight_summary text,
+  error_type text,
+  error_message text,
+  suggested_alternatives ARRAY,
+  llm_provider text,
+  llm_model text,
+  llm_latency_ms integer,
+  query_latency_ms integer,
+  data_freshness_seconds integer,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT thread_turns_pkey PRIMARY KEY (id),
+  CONSTRAINT thread_turns_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id)
+);
+CREATE TABLE public.threads (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  client_id uuid NOT NULL,
+  title text,
+  is_pinned boolean DEFAULT false,
+  pin_order integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT threads_pkey PRIMARY KEY (id),
+  CONSTRAINT threads_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT threads_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT threads_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id)
+);
+CREATE TABLE public.user_client_access (
+  user_id uuid NOT NULL,
+  client_id uuid NOT NULL,
+  CONSTRAINT user_client_access_pkey PRIMARY KEY (user_id, client_id),
+  CONSTRAINT user_client_access_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT user_client_access_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  full_name text NOT NULL,
+  role text NOT NULL CHECK (role = ANY (ARRAY['claims_manager'::text, 'team_lead'::text, 'adjuster'::text, 'executive'::text, 'admin'::text])),
+  avatar_url text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.webhook_endpoints (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  url text NOT NULL,
+  events ARRAY NOT NULL,
+  secret text NOT NULL,
+  is_active boolean DEFAULT true,
+  last_called_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT webhook_endpoints_pkey PRIMARY KEY (id),
+  CONSTRAINT webhook_endpoints_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
