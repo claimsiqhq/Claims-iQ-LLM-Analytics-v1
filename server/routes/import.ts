@@ -21,7 +21,7 @@ const PERILS = ["Wind", "Hail", "Water", "Fire", "Tornado", "Wind/Hail"];
 importRouter.post("/api/import-spreadsheet", async (_req, res) => {
   try {
     const supabase = getSupabaseClient();
-    const filePath = path.resolve("attached_assets/claims_iq_all_50_claims_1770882172302.xlsx");
+    const filePath = path.resolve("attached_assets/Claims_iQ_Claims_data_import_2-13-2026_1770896265070.xlsx");
     const wb = XLSX.readFile(filePath);
 
     const claimsSheet = XLSX.utils.sheet_to_json(wb.Sheets["claims"]) as any[];

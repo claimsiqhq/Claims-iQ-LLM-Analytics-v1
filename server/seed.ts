@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __seed_dirname = typeof __dirname !== "undefined"
   ? __dirname
   : path.dirname(fileURLToPath(import.meta.url));
-const SPREADSHEET_PATH = path.resolve(__seed_dirname, "../attached_assets/claims_iq_all_50_claims_1770882172302.xlsx");
+const SPREADSHEET_PATH = path.resolve(__seed_dirname, "../attached_assets/Claims_iQ_Claims_data_import_2-13-2026_1770896265070.xlsx");
 
 function readSpreadsheet() {
   const wb = XLSX.readFile(SPREADSHEET_PATH);
