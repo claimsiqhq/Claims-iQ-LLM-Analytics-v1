@@ -77,7 +77,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
   };
 
   return (
-    <Card className="border-l-4 border-brand-gold bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/30 mb-6 overflow-hidden">
+    <Card data-tour="morning-brief" className="border-l-4 border-brand-gold bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/30 mb-6 overflow-hidden">
       <div className="flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">

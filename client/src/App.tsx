@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { MessageCircle } from 'lucide-react';
 import { VoiceAgent } from "@/components/VoiceAgent";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { Walkthrough, shouldShowWalkthrough } from "@/components/Walkthrough";
 
 export interface ChartResponse {
   thread_id: string;
@@ -59,6 +60,17 @@ function App() {
 
   const isMobile = useIsMobile();
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (shouldShowWalkthrough()) {
+        setWalkthroughOpen(true);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const isDragging = useRef(false);
@@ -151,6 +163,7 @@ function App() {
           clientId={selectedClientId}
           onClientChange={setSelectedClientId}
           onSettingsClick={() => setShowSettings(true)}
+          onWalkthroughClick={() => setWalkthroughOpen(true)}
         />
         <div className="flex h-screen overflow-hidden">
           {isMobile ? (
@@ -211,7 +224,7 @@ function App() {
             >
               <KPICards clientId={selectedClientId} />
               <MorningBrief clientId={selectedClientId} />
-              <div ref={chartContainerRef}>
+              <div ref={chartContainerRef} data-tour="canvas-area">
                 <Canvas
                   activeThreadId={activeThreadId}
                   currentResponse={currentResponse}
@@ -244,6 +257,8 @@ function App() {
           onNewResponse={handleNewResponse}
           isMobile={isMobile}
         />
+
+        <Walkthrough isOpen={walkthroughOpen} onClose={() => setWalkthroughOpen(false)} />
 
         <Toaster />
       </div>

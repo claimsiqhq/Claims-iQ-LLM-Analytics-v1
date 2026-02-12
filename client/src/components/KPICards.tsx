@@ -50,7 +50,7 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
   if (loading || kpis.length === 0) return null;
 
   return (
-    <div className="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto pb-1 md:pb-0 md:flex-wrap md:justify-center scrollbar-thin">
+    <div data-tour="kpi-strip" className="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto pb-1 md:pb-0 md:flex-wrap md:justify-center scrollbar-thin">
       {kpis.map((kpi, idx) => (
         <Card
           key={idx}
