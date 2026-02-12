@@ -54,19 +54,26 @@ function generateClaims(count: number, clientId: string, adjusterIds: string[]):
     const state_code = randomChoice(STATES[region]);
     const severity = randomChoice(SEVERITIES);
     const fnol_date = randomDate(yearAgo, now);
-    const isClosed = Math.random() < 0.55;
-    const status = isClosed ? "closed" : randomChoice(["open", "in_progress", "review"] as const);
-    const stageIdx = isClosed ? STAGES.length - 1 : status === "review" ? Math.max(2, randomInt(2, STAGES.length - 2)) : randomInt(0, STAGES.length - 2);
+    const status = "open";
+    const roll = Math.random();
+    let stageIdx: number;
+    if (roll < 0.80) {
+      stageIdx = randomInt(0, 3);
+    } else if (roll < 0.95) {
+      stageIdx = 4;
+    } else {
+      stageIdx = 5;
+    }
     const current_stage = STAGES[stageIdx];
     const sla_target_days = severity === "critical" ? 14 : severity === "high" ? 21 : severity === "medium" ? 30 : 45;
     const daysOpen = (now.getTime() - fnol_date.getTime()) / 86400000;
-    const closed_at = isClosed ? new Date(fnol_date.getTime() + randomInt(3, Math.max(5, sla_target_days + 20)) * 86400000) : null;
-    const actualDays = closed_at ? (closed_at.getTime() - fnol_date.getTime()) / 86400000 : daysOpen;
+    const closed_at = null;
+    const actualDays = daysOpen;
     const sla_breached = actualDays > sla_target_days;
     const first_touch_at = new Date(fnol_date.getTime() + randomInt(1, 48) * 3600000);
     const assigned_at = new Date(fnol_date.getTime() + randomInt(0, 24) * 3600000);
     const reserve_amount = randomInt(1000, 250000) + Math.random() * 100;
-    const paid_amount = isClosed ? reserve_amount * (0.3 + Math.random() * 0.7) : 0;
+    const paid_amount = 0;
     const hasIssues = Math.random() < 0.25;
     const issue_types = hasIssues ? Array.from(new Set(Array.from({ length: randomInt(1, 3) }, () => randomChoice(ISSUE_TYPES)))) : [];
     const reopen_count = 0;
@@ -82,7 +89,7 @@ function generateClaims(count: number, clientId: string, adjusterIds: string[]):
       assigned_at: assigned_at.toISOString(),
       fnol_date: fnol_date.toISOString(),
       first_touch_at: first_touch_at.toISOString(),
-      closed_at: closed_at?.toISOString() || null,
+      closed_at: null,
       reserve_amount: Math.round(reserve_amount * 100) / 100,
       paid_amount: Math.round(paid_amount * 100) / 100,
       sla_target_days, sla_breached, has_issues: hasIssues,
