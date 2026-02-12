@@ -37,18 +37,18 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
   if (loading || kpis.length === 0) return null;
 
   return (
-    <div className="flex gap-3 mb-4 md:mb-6 overflow-x-auto pb-1 md:pb-0 md:flex-wrap md:justify-center scrollbar-thin">
+    <div className="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto pb-1 md:pb-0 md:flex-wrap md:justify-center scrollbar-thin">
       {kpis.map((kpi, idx) => (
         <Card
           key={idx}
-          className="px-3 md:px-4 py-2.5 md:py-3 min-w-[120px] md:min-w-[140px] border border-surface-grey-lavender bg-white shadow-sm shrink-0"
+          className="px-2.5 md:px-3 py-2 md:py-2.5 min-w-[100px] md:min-w-[120px] border border-surface-grey-lavender bg-white shadow-sm shrink-0"
           data-testid={`kpi-card-${kpi.label.toLowerCase().replace(/\s+/g, "-")}`}
         >
-          <p className="text-xs text-text-secondary font-medium">{kpi.label}</p>
-          <p className="text-xl font-bold text-brand-deep-purple font-mono mt-1">
+          <p className="text-[10px] md:text-xs text-text-secondary font-medium leading-tight truncate">{kpi.label}</p>
+          <p className="text-base md:text-lg font-bold text-brand-deep-purple font-mono mt-0.5">
             {kpi.value}
             {kpi.unit && kpi.unit !== "%" && (
-              <span className="text-sm font-normal text-text-secondary ml-1">{kpi.unit}</span>
+              <span className="text-xs font-normal text-text-secondary ml-0.5">{kpi.unit}</span>
             )}
           </p>
         </Card>

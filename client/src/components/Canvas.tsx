@@ -661,13 +661,13 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
 
   if (chartPanels.length === 0 && (!activeThreadId || activeThreadId === 'new' || !currentResponse)) {
     return (
-      <div className="bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 min-h-[400px]">
+      <div className="bg-surface-off-white flex flex-col items-center justify-center p-6 md:p-8 text-center animate-in fade-in duration-500">
         <div className="max-w-md">
-          <img src={emptyStateImg} alt="No Data" className="w-48 h-48 object-contain mx-auto opacity-90 mix-blend-multiply mb-6" />
-          <h1 className="type-h1 text-brand-deep-purple mb-3" data-testid="text-hero-title">
+          <img src={emptyStateImg} alt="No Data" className="w-32 md:w-40 h-32 md:h-40 object-contain mx-auto opacity-90 mix-blend-multiply mb-4" />
+          <h1 className="type-h1 text-brand-deep-purple mb-2" data-testid="text-hero-title">
             Claims Intelligence Layer
           </h1>
-          <p className="type-body text-brand-purple-secondary mb-8 text-center" data-testid="text-hero-subtitle">
+          <p className="type-body text-brand-purple-secondary mb-5 text-center" data-testid="text-hero-subtitle">
             Ask questions to build your analytics dashboard. Each chart stays on the canvas so you can compare multiple metrics side by side.
           </p>
           <div className="flex flex-wrap gap-2 justify-center opacity-60">
