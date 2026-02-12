@@ -401,6 +401,9 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
   const [defaultTimeRange, setDefaultTimeRange] = useState("30d");
   const [notifications, setNotifications] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(300);
+  const [voiceVoice, setVoiceVoice] = useState("ash");
+  const [voiceTurnSensitivity, setVoiceTurnSensitivity] = useState(0.8);
+  const [voiceSilenceDuration, setVoiceSilenceDuration] = useState(800);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -413,6 +416,9 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
           setDefaultTimeRange(d.data.default_time_range || "30d");
           setNotifications(d.data.notifications_enabled ?? true);
           setAutoRefresh(d.data.auto_refresh_interval || 300);
+          setVoiceVoice(d.data.voice_voice || "ash");
+          setVoiceTurnSensitivity(d.data.voice_turn_sensitivity ?? 0.8);
+          setVoiceSilenceDuration(d.data.voice_silence_duration ?? 800);
         }
       })
       .catch(() => {});

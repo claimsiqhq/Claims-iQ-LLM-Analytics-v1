@@ -240,7 +240,7 @@ export const DrillDownPanel: React.FC<DrillDownPanelProps> = ({
           )}
 
           {!loading && !error && claims.length > 0 && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-x-auto overflow-y-visible">
               <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow className="border-b border-gray-200">

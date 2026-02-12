@@ -413,9 +413,9 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
     <div
       data-testid="voice-agent-panel"
       className={cn(
-        "fixed z-50 bg-white rounded-2xl shadow-2xl border border-surface-grey-lavender overflow-hidden transition-all duration-300",
+        "fixed z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-surface-grey-lavender dark:border-gray-700 overflow-hidden transition-all duration-300",
         isMobile
-          ? "bottom-4 left-4 right-4"
+          ? "bottom-4 left-4 right-4 max-h-[80vh] flex flex-col pb-[env(safe-area-inset-bottom,0px)]"
           : "bottom-6 right-6 w-[380px]"
       )}
     >
@@ -461,7 +461,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
             <button
               onClick={() => setMuted((m) => !m)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors",
+                "flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg transition-colors touch-manipulation",
                 muted ? "bg-red-500/20 text-red-600" : "bg-white/10 text-white/80 hover:bg-white/20"
               )}
               title={muted ? "Unmute microphone" : "Mute microphone"}

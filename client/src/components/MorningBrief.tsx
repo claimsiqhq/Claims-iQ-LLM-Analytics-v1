@@ -101,7 +101,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
           <button
             onClick={fetchMorningBrief}
             disabled={loading}
-            className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label="Refresh brief"
             data-testid="button-refresh-brief"
           >
@@ -109,7 +109,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
           </button>
           <button
             onClick={() => setIsDismissed(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
             aria-label="Dismiss brief"
             data-testid="button-dismiss-brief"
           >
@@ -166,7 +166,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
         {briefData.content.split("\n").length > 3 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-3 text-sm font-medium text-brand-purple hover:text-brand-deep-purple transition-colors flex items-center gap-1"
+            className="mt-3 min-h-[44px] px-4 text-sm font-medium text-brand-purple hover:text-brand-deep-purple transition-colors flex items-center gap-1 touch-manipulation"
             data-testid="button-toggle-brief"
           >
             {isExpanded ? <>Show less <NavArrowUp width={16} height={16} /></> : <>Show more <NavArrowDown width={16} height={16} /></>}
