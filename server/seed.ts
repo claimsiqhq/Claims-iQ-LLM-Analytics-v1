@@ -310,8 +310,35 @@ function parseTimestamp(val: any): string | null {
 async function seedClient(supabase: any, clientId: string, clientName: string, data: ReturnType<typeof readSpreadsheet>): Promise<void> {
   console.log(`\n--- Seeding client: ${clientName} (${clientId}) ---`);
 
+  console.log("  Cleaning old claim data...");
+  const { data: oldClaimIds } = await supabase.from("claims").select("id").eq("client_id", clientId);
+  if (oldClaimIds?.length) {
+    const ids = oldClaimIds.map((c: any) => c.id);
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      await supabase.from("claim_llm_usage").delete().in("claim_id", batch);
+      await supabase.from("claim_reviews").delete().in("claim_id", batch);
+      await supabase.from("claim_stage_history").delete().in("claim_id", batch);
+      await supabase.from("claim_policies").delete().in("claim_id", batch);
+      await supabase.from("claim_estimates").delete().in("claim_id", batch);
+      await supabase.from("claim_billing").delete().in("claim_id", batch);
+    }
+    await supabase.from("claims").delete().eq("client_id", clientId);
+    console.log(`  Cleaned ${oldClaimIds.length} old claims and related data`);
+  }
+
+  await supabase.from("morning_briefs").delete().eq("client_id", clientId);
+  const threadIds = (await supabase.from("threads").select("id").eq("client_id", clientId)).data?.map((t: any) => t.id) || [];
+  if (threadIds.length) {
+    await supabase.from("thread_turns").delete().in("thread_id", threadIds);
+  }
+  await supabase.from("threads").delete().eq("client_id", clientId);
+
   console.log("  Deleting existing adjusters...");
-  await supabase.from("adjusters").delete().eq("client_id", clientId);
+  const { error: adjDelErr } = await supabase.from("adjusters").delete().eq("client_id", clientId);
+  if (adjDelErr) {
+    console.error(`  Warning: adjuster delete error: ${adjDelErr.message}`);
+  }
 
   console.log(`  Inserting ${data.adjusters.length} adjusters from spreadsheet...`);
   const adjusterRows = data.adjusters.map((a, idx) => ({
@@ -336,30 +363,6 @@ async function seedClient(supabase: any, clientId: string, clientName: string, d
     adjusterIdMap.set(`ADJ-${String(idx + 1).padStart(3, "0")}`, a.id);
   });
   const adjusterDbIds = insertedAdj.map((a: any) => a.id);
-
-  console.log("  Cleaning old claim data...");
-  const { data: oldClaimIds } = await supabase.from("claims").select("id").eq("client_id", clientId);
-  if (oldClaimIds?.length) {
-    const ids = oldClaimIds.map((c: any) => c.id);
-    for (let i = 0; i < ids.length; i += 100) {
-      const batch = ids.slice(i, i + 100);
-      await supabase.from("claim_llm_usage").delete().in("claim_id", batch);
-      await supabase.from("claim_reviews").delete().in("claim_id", batch);
-      await supabase.from("claim_stage_history").delete().in("claim_id", batch);
-      await supabase.from("claim_policies").delete().in("claim_id", batch);
-      await supabase.from("claim_estimates").delete().in("claim_id", batch);
-      await supabase.from("claim_billing").delete().in("claim_id", batch);
-    }
-    await supabase.from("claims").delete().eq("client_id", clientId);
-    console.log(`  Cleaned ${oldClaimIds.length} old claims and related data`);
-  }
-
-  await supabase.from("morning_briefs").delete().eq("client_id", clientId);
-  const threadIds = (await supabase.from("threads").select("id").eq("client_id", clientId)).data?.map((t: any) => t.id) || [];
-  if (threadIds.length) {
-    await supabase.from("thread_turns").delete().in("thread_id", threadIds);
-  }
-  await supabase.from("threads").delete().eq("client_id", clientId);
 
   console.log(`  Filling missing dates for claims...`);
   fillMissingDates(data.claims);
