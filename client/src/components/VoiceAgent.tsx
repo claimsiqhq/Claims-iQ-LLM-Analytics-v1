@@ -144,7 +144,13 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         audioEl.srcObject = event.streams[0];
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
