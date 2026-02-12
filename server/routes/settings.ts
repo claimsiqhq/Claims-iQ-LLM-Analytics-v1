@@ -281,6 +281,23 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       }
     }
 
+    const { data: allAdj } = await sb.from("adjusters").select("id").eq("client_id", clientId);
+    if (allAdj?.length) {
+      const { data: referencedAdj } = await sb
+        .from("claims")
+        .select("assigned_adjuster_id")
+        .eq("client_id", clientId)
+        .not("assigned_adjuster_id", "is", null);
+      const referencedIds = new Set((referencedAdj || []).map((c: any) => c.assigned_adjuster_id));
+      const orphanedIds = allAdj.filter((a: any) => !referencedIds.has(a.id)).map((a: any) => a.id);
+      if (orphanedIds.length > 0) {
+        for (let i = 0; i < orphanedIds.length; i += 100) {
+          await sb.from("adjusters").delete().in("id", orphanedIds.slice(i, i + 100));
+        }
+        result.imported.adjustersRemoved = orphanedIds.length;
+      }
+    }
+
     res.json({
       status: "ok",
       message: mode === "replace" ? "Data replaced successfully" : "New data appended successfully",
