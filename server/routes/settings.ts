@@ -225,20 +225,28 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     }
 
     const STATUS_REMAP: Record<string, string> = {
-      denied: "in_review",
+      denied: "open",
       closed: "open",
       closed_no_payment: "open",
     };
+    const STAGE_REMAP: Record<string, string> = {
+      closed: "under_review",
+      denied: "under_review",
+      closed_denied: "under_review",
+      closed_settled: "payment_issued",
+      closed_no_payment: "under_review",
+    };
     let statusRemapped = 0;
     for (const row of claimsSheet) {
-      const raw = (row.status || "open").toLowerCase();
-      if (STATUS_REMAP[raw]) {
-        row.status = STATUS_REMAP[raw];
-        if (row.current_stage === "closed" || row.current_stage === "denied") {
-          row.current_stage = "in_review";
-        }
+      const rawStatus = (row.status || "open").toLowerCase();
+      if (STATUS_REMAP[rawStatus]) {
+        row.status = STATUS_REMAP[rawStatus];
         row.closed_at = null;
         statusRemapped++;
+      }
+      const rawStage = (row.current_stage || "").toLowerCase();
+      if (STAGE_REMAP[rawStage]) {
+        row.current_stage = STAGE_REMAP[rawStage];
       }
     }
     const filteredClaims = claimsSheet;
@@ -270,7 +278,7 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
         const firstTouchAt = row.first_touch_at ? new Date(row.first_touch_at).toISOString() : fnolDate;
 
         const rawName = row.claimant_name || "";
-        const needsName = !rawName || rawName === "REDACTED" || rawName.trim() === "" || /^Insured\s*#/i.test(rawName);
+        const needsName = !rawName || rawName === "REDACTED" || /^Redacted/i.test(rawName) || rawName.trim() === "" || /^Insured\s*#/i.test(rawName);
         const claimantName = needsName ? generateName() : rawName;
 
         return {
@@ -293,7 +301,7 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
           sla_target_days: row.sla_target_days ?? 30,
           sla_breached: row.sla_breached ?? false,
           has_issues: row.has_issues ?? false,
-          issue_types: [],
+          issue_types: row.issue_types ? (typeof row.issue_types === 'string' ? row.issue_types.split(',').map((s: string) => s.trim()) : Array.isArray(row.issue_types) ? row.issue_types : []) : [],
           reopen_count: row.reopen_count ?? 0,
         };
       });
@@ -302,7 +310,12 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       for (let i = 0; i < allNewClaims.length; i += 25) {
         const batch = allNewClaims.slice(i, i + 25);
         const { error } = await sb.from("claims").insert(batch);
-        if (!error) claimsInserted += batch.length;
+        if (error) {
+          console.error(`[import] claims batch ${i} error:`, error.message, error.details, error.hint);
+          console.error(`[import] sample row:`, JSON.stringify(batch[0]));
+        } else {
+          claimsInserted += batch.length;
+        }
       }
       result.imported.claims = claimsInserted;
 
