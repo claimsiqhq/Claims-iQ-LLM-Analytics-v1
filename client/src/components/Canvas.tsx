@@ -17,13 +17,14 @@ import {
   Legend
 } from 'recharts';
 import { FilterList, Download, Refresh } from 'iconoir-react';
-import { Info, Loader2 } from 'lucide-react';
+import { Info, Loader2, X, LayoutGrid, LayoutList, Trash2, Save, FolderOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import emptyStateImg from "@/assets/empty-state.png";
 import type { ChartResponse } from "@/App";
 import { DrillDownPanel } from "@/components/DrillDownPanel";
 import { DataTable } from "@/components/DataTable";
 import { ExportMenu } from "@/components/ExportMenu";
+import { saveDashboard, getDashboards, deleteDashboard } from "@/lib/api";
 
 const CHART_COLORS = [
   '#7763B7', '#C6A54E', '#9D8BBF', '#E8C97A', '#5A4A8A',
@@ -34,9 +35,10 @@ interface DynamicChartProps {
   response: ChartResponse;
   onChartClick?: (data: any) => void;
   currentMetric?: string;
+  compact?: boolean;
 }
 
-const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartProps) => {
+const DynamicChart = ({ response, onChartClick, currentMetric, compact }: DynamicChartProps) => {
   if (!response.chart?.data) return null;
 
   const { type, data, title } = response.chart;
@@ -51,6 +53,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
   });
 
   const unit = datasets[0]?.unit || '';
+  const chartHeight = compact ? 250 : 350;
 
   const formatValue = (val: number) => {
     if (unit === 'percentage') return `${val}%`;
@@ -70,17 +73,17 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
   const xAxisProps = {
     ...commonAxisProps,
     dataKey: "name",
-    tick: { fill: '#6B6280', fontSize: 11, fontFamily: 'Source Sans Pro' },
+    tick: { fill: '#6B6280', fontSize: compact ? 10 : 11, fontFamily: 'Source Sans Pro' },
     dy: 10,
     interval: 0 as const,
-    angle: labels.length > 8 ? -45 : 0,
-    textAnchor: labels.length > 8 ? 'end' as const : 'middle' as const,
-    height: labels.length > 8 ? 80 : 40,
+    angle: labels.length > 6 ? -45 : 0,
+    textAnchor: labels.length > 6 ? 'end' as const : 'middle' as const,
+    height: labels.length > 6 ? 70 : 40,
   };
 
   const yAxisProps = {
     ...commonAxisProps,
-    tick: { fill: '#6B6280', fontSize: 12, fontFamily: 'Space Mono' },
+    tick: { fill: '#6B6280', fontSize: compact ? 10 : 12, fontFamily: 'Space Mono' },
     tickFormatter: (v: number) => formatValue(v),
   };
 
@@ -125,15 +128,15 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
 
   if (type === 'pie') {
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <PieChart>
           <Pie
             data={chartData}
             cx="50%"
             cy="50%"
-            labelLine={true}
-            label={({ name, value0 }) => `${name}: ${formatValue(value0)}`}
-            outerRadius={120}
+            labelLine={!compact}
+            label={compact ? false : ({ name, value0 }) => `${name}: ${formatValue(value0)}`}
+            outerRadius={compact ? 80 : 120}
             dataKey="value0"
             animationDuration={1500}
             onClick={handleChartClick}
@@ -143,6 +146,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
             ))}
           </Pie>
           <Tooltip {...tooltipProps} />
+          {compact && <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />}
         </PieChart>
       </ResponsiveContainer>
     );
@@ -150,16 +154,16 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
 
   if (type === 'stacked_bar') {
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} onClick={handleChartClick}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
           <Tooltip {...tooltipProps} />
           <Legend
-            wrapperStyle={{ paddingTop: '20px' }}
+            wrapperStyle={{ paddingTop: '10px' }}
             iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
+            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
           />
           {datasets.map((ds, idx) => (
             <Bar
@@ -237,7 +241,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
       cumulative: running[i] ?? 0,
     }));
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={waterfallData} margin={{ top: 20 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
@@ -266,16 +270,16 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
 
   if (type === 'line') {
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <LineChart data={chartData} onClick={handleChartClick}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
           <Tooltip {...tooltipProps} />
           <Legend
-            wrapperStyle={{ paddingTop: '20px' }}
+            wrapperStyle={{ paddingTop: '10px' }}
             iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
+            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
           />
           {datasets.map((ds, idx) => (
             <Line
@@ -285,7 +289,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
               name={ds.label}
               stroke={CHART_COLORS[idx]}
               strokeWidth={2.5}
-              dot={{ fill: CHART_COLORS[idx], r: 4 }}
+              dot={{ fill: CHART_COLORS[idx], r: compact ? 3 : 4 }}
               animationDuration={1500}
             />
           ))}
@@ -296,16 +300,16 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
 
   if (type === 'area') {
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <AreaChart data={chartData} onClick={handleChartClick}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
           <Tooltip {...tooltipProps} />
           <Legend
-            wrapperStyle={{ paddingTop: '20px' }}
+            wrapperStyle={{ paddingTop: '10px' }}
             iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
+            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
           />
           {datasets.map((ds, idx) => (
             <Area
@@ -325,16 +329,16 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
   }
 
   return (
-    <ResponsiveContainer width="100%" height={350}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart data={chartData} barGap={4} onClick={handleChartClick}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
         <XAxis {...xAxisProps} />
         <YAxis {...yAxisProps} />
         <Tooltip {...tooltipProps} />
         <Legend
-          wrapperStyle={{ paddingTop: '20px' }}
+          wrapperStyle={{ paddingTop: '10px' }}
           iconType="circle"
-          formatter={(value) => <span style={{ color: '#342A4F', fontSize: '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
+          formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
         />
         {datasets.map((ds, idx) => (
           <Bar
@@ -352,113 +356,125 @@ const DynamicChart = ({ response, onChartClick, currentMetric }: DynamicChartPro
   );
 };
 
-interface CanvasProps {
-  activeThreadId: string | null;
-  currentResponse: ChartResponse | null;
-  isLoading: boolean;
-  clientId?: string;
-  onFollowUpClick?: (question: string) => void;
-}
-
 const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table", "heatmap", "waterfall"] as const;
 
-export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = "", onFollowUpClick }: CanvasProps) => {
-  const [drillDownOpen, setDrillDownOpen] = useState(false);
-  const [drillDownMetric, setDrillDownMetric] = useState("");
-  const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});
+interface ChartPanelProps {
+  response: ChartResponse;
+  compact: boolean;
+  onRemove?: () => void;
+  onChartClick: (data: any) => void;
+  onFollowUpClick?: (question: string) => void;
+  clientId: string;
+  isLatest?: boolean;
+}
+
+const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick, clientId, isLatest }: ChartPanelProps) => {
   const [chartTypeOverride, setChartTypeOverride] = useState<string | null>(null);
   const chartAreaRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setChartTypeOverride(null);
-  }, [currentResponse?.turn_id]);
+  }, [response.turn_id]);
 
-  const handleChartClick = (data: any) => {
-    if (data?.metric) {
-      setDrillDownMetric(data.metric);
-      setDrillDownFilters(data.filters || {});
-      setDrillDownOpen(true);
-    }
-  };
-  if (isLoading && !currentResponse) {
-    return (
-      <div className="min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center">
-        <Loader2 className="w-12 h-12 text-brand-purple animate-spin mb-4" />
-        <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
-      </div>
-    );
-  }
+  if (!response.chart) return null;
 
-  if (!activeThreadId || activeThreadId === 'new' || !currentResponse) {
-    return (
-      <div className="min-h-screen bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-        <div className="max-w-md">
-          <img src={emptyStateImg} alt="No Data" className="w-64 h-64 object-contain mx-auto opacity-90 mix-blend-multiply mb-6" />
-          <h1 className="type-h1 text-brand-deep-purple mb-3" data-testid="text-hero-title">
-            Claims Intelligence Layer
-          </h1>
-          <p className="type-body text-brand-purple-secondary mb-8 text-center" data-testid="text-hero-subtitle">
-            Select a thread from the history or start a new conversation to analyze claims data, SLAs, and litigation risks.
-          </p>
-          <div className="flex flex-wrap gap-2 justify-center opacity-60">
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Breach Rate?</span>
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Backlog Analysis</span>
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Cost Drivers</span>
+  return (
+    <div className={`bg-white rounded-xl border shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500 ${isLatest ? 'border-brand-purple/40 ring-1 ring-brand-purple/20' : 'border-surface-grey-lavender'}`} data-testid={`chart-panel-${response.turn_id}`}>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          className="absolute top-3 right-3 z-10 p-1 rounded-md hover:bg-red-50 text-text-secondary hover:text-red-500 transition-colors"
+          data-testid={`btn-remove-panel-${response.turn_id}`}
+          title="Remove panel"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+
+      <div className={`${compact ? 'p-4' : 'p-6'}`} ref={chartAreaRef}>
+        <div className="flex justify-between items-start mb-4 pr-6">
+          <div className="min-w-0 flex-1">
+            <h2 className={`font-display font-semibold text-brand-deep-purple mb-1 truncate ${compact ? 'text-base' : 'text-xl'}`} data-testid="text-chart-title">
+              {response.chart.title}
+            </h2>
+            {!compact && response.metadata?.metric_definition && (
+              <p className="text-sm text-text-secondary font-body truncate">
+                {response.metadata.metric_definition}
+              </p>
+            )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (currentResponse.error) {
-    return (
-      <div className="min-h-screen bg-surface-off-white p-8">
-        <div className="max-w-[1000px] mx-auto">
-          <div className="bg-white border-l-4 border-status-alert p-6 rounded-r-xl shadow-sm">
-            <h2 className="type-h2 text-brand-deep-purple mb-2">Unable to Process</h2>
-            <p className="type-body text-brand-deep-purple">{currentResponse.error.message}</p>
-            {currentResponse.error.suggestions && (
-              <div className="mt-4">
-                <p className="text-sm text-text-secondary mb-2">Try asking about:</p>
-                <div className="flex flex-wrap gap-2">
-                  {currentResponse.error.suggestions.map((s, i) => (
-                    <span key={i} className="px-3 py-1 bg-surface-purple-light rounded-full text-xs text-brand-deep-purple">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          <div className="flex gap-1.5 items-center shrink-0 ml-2">
+            <select
+              value={chartTypeOverride ?? response.chart.type}
+              onChange={(e) => setChartTypeOverride(e.target.value)}
+              className={`border border-surface-grey-lavender rounded-lg bg-white text-brand-deep-purple hover:border-brand-purple-light focus:outline-none focus:ring-2 focus:ring-brand-purple-light ${compact ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1.5'}`}
+              data-testid="chart-type-select"
+            >
+              {CHART_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t === "stacked_bar" ? "Stacked Bar" : t.charAt(0).toUpperCase() + t.slice(1)}
+                </option>
+              ))}
+            </select>
+            {!compact && (
+              <ExportMenu
+                chartData={response.chart.data}
+                chartTitle={response.chart.title || "Chart"}
+                chartContainerRef={chartAreaRef}
+              />
             )}
           </div>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-surface-off-white p-8">
-      <div className="max-w-[1000px] mx-auto space-y-8">
-        {currentResponse.insight && (
-          <div className="bg-white border-l-4 border-brand-purple p-6 rounded-r-xl shadow-sm animate-in slide-in-from-bottom-4 duration-500" data-testid="insight-summary">
-            <h2 className="type-h2 text-brand-deep-purple mb-2">Insight Summary</h2>
+        <div className={`w-full ${compact ? 'min-h-[250px]' : 'min-h-[350px]'}`}>
+          <DynamicChart
+            response={{
+              ...response,
+              chart: {
+                ...response.chart,
+                type: chartTypeOverride ?? response.chart.type,
+              },
+            }}
+            onChartClick={onChartClick}
+            currentMetric={response.chart?.title}
+            compact={compact}
+          />
+        </div>
+
+        <div className={`mt-4 pt-3 border-t border-surface-grey-lavender flex items-center justify-between text-xs text-text-secondary ${compact ? 'gap-2' : ''}`}>
+          <div className="flex gap-3 truncate">
+            <span className="flex items-center gap-1">
+              <Refresh className="w-3.5 h-3.5 text-brand-gold" />
+              {response.metadata?.query_ms || 0}ms
+            </span>
+            {response.metadata?.cache_hit && (
+              <span className="text-green-600 font-medium">cached</span>
+            )}
+          </div>
+          <div className="font-mono bg-surface-purple-light px-2 py-0.5 rounded text-brand-deep-purple text-xs" data-testid="text-record-count">
+            n={response.metadata?.record_count?.toLocaleString() || 0}
+          </div>
+        </div>
+      </div>
+
+      {!compact && response.insight && (
+        <div className="px-6 pb-4">
+          <div className="bg-surface-purple-light/50 border-l-3 border-brand-purple p-4 rounded-r-lg">
             <div className="prose prose-sm max-w-none">
               <ReactMarkdown
                 components={{
                   p: ({ children }) => (
-                    <p className="type-body text-brand-deep-purple leading-relaxed mb-2 last:mb-0">{children}</p>
+                    <p className="type-body text-brand-deep-purple leading-relaxed mb-1 last:mb-0 text-sm">{children}</p>
                   ),
                   strong: ({ children }) => (
                     <strong className="font-semibold text-brand-deep-purple">{children}</strong>
                   ),
                   ul: ({ children }) => (
-                    <ul className="text-sm text-brand-deep-purple space-y-1 mb-2 ml-1">{children}</ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="text-sm text-brand-deep-purple space-y-1 mb-2 ml-1 list-decimal list-inside">{children}</ol>
+                    <ul className="text-sm text-brand-deep-purple space-y-0.5 mb-1 ml-1">{children}</ul>
                   ),
                   li: ({ children }) => (
-                    <li className="flex items-start gap-2 text-sm leading-relaxed">
-                      <span className="text-brand-gold mt-0.5 shrink-0">●</span>
+                    <li className="flex items-start gap-1.5 text-sm leading-relaxed">
+                      <span className="text-brand-gold mt-0.5 shrink-0 text-xs">●</span>
                       <span>{children}</span>
                     </li>
                   ),
@@ -467,117 +483,358 @@ export const Canvas = ({ activeThreadId, currentResponse, isLoading, clientId = 
                   ),
                 }}
               >
-                {currentResponse.insight}
+                {response.insight}
               </ReactMarkdown>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {currentResponse.chart && (
-          <div ref={chartAreaRef} className="w-full min-h-[400px] bg-white rounded-xl border border-surface-grey-lavender p-6 shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500" data-testid="chart-area">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h2 className="text-xl font-display font-semibold text-brand-deep-purple mb-1" data-testid="text-chart-title">
-                  {currentResponse.chart.title}
-                </h2>
-                {currentResponse.metadata?.metric_definition && (
-                  <p className="text-sm text-text-secondary font-body">
-                    {currentResponse.metadata.metric_definition}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <select
-                  value={chartTypeOverride ?? currentResponse.chart.type}
-                  onChange={(e) => setChartTypeOverride(e.target.value)}
-                  className="text-sm border border-surface-grey-lavender rounded-lg px-3 py-1.5 bg-white text-brand-deep-purple hover:border-brand-purple-light focus:outline-none focus:ring-2 focus:ring-brand-purple-light"
-                  data-testid="chart-type-select"
-                >
-                  {CHART_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t === "stacked_bar" ? "Stacked Bar" : t.charAt(0).toUpperCase() + t.slice(1)}
-                    </option>
-                  ))}
-                </select>
-                <button className="p-2 hover:bg-surface-purple-light rounded-lg text-text-secondary hover:text-brand-purple transition-colors">
-                  <FilterList className="w-5 h-5" />
-                </button>
-                <ExportMenu
-                  chartData={currentResponse.chart.data}
-                  chartTitle={currentResponse.chart.title || "Chart"}
-                  chartContainerRef={chartAreaRef}
-                />
-              </div>
-            </div>
-
-            <div className="h-[350px] w-full min-h-[350px]">
-              {isLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-brand-purple animate-spin" />
-                </div>
-              ) : (
-                <DynamicChart
-                  response={{
-                    ...currentResponse,
-                    chart: {
-                      ...currentResponse.chart,
-                      type: chartTypeOverride ?? currentResponse.chart.type,
-                    },
-                  }}
-                  onChartClick={handleChartClick}
-                  currentMetric={currentResponse.chart?.title}
-                />
-              )}
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-surface-grey-lavender flex items-center justify-between text-xs text-text-secondary">
-              <div className="flex gap-4">
-                {currentResponse.metadata?.metric_definition && (
-                  <span className="flex items-center gap-1.5">
-                    <Info className="w-4 h-4 text-brand-purple-secondary" />
-                    {currentResponse.metadata.metric_definition.slice(0, 60)}
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5">
-                  <Refresh className="w-4 h-4 text-brand-gold" />
-                  Query: {currentResponse.metadata?.query_ms || 0}ms | LLM: {currentResponse.metadata?.llm_ms || 0}ms
-                </span>
-              </div>
-              <div className="font-mono bg-surface-purple-light px-2 py-1 rounded text-brand-deep-purple" data-testid="text-record-count">
-                n={currentResponse.metadata?.record_count?.toLocaleString() || 0} records
-              </div>
-            </div>
-          </div>
-        )}
-
-        {currentResponse.followUpSuggestions && currentResponse.followUpSuggestions.length > 0 && (
-          <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 duration-300" data-testid="follow-up-suggestions">
-            <span className="text-xs text-text-secondary font-medium self-center mr-1">You might also ask:</span>
-            {currentResponse.followUpSuggestions.map((q, i) => (
+      {!compact && response.followUpSuggestions && response.followUpSuggestions.length > 0 && (
+        <div className="px-6 pb-4">
+          <div className="flex flex-wrap gap-1.5" data-testid="follow-up-suggestions">
+            <span className="text-xs text-text-secondary font-medium self-center mr-1">Ask next:</span>
+            {response.followUpSuggestions.map((q, i) => (
               <button
                 key={i}
                 onClick={() => onFollowUpClick?.(q)}
-                className="px-3 py-1.5 bg-white border border-brand-purple-light rounded-full text-xs text-brand-deep-purple hover:bg-surface-purple-light hover:border-brand-purple transition-colors cursor-pointer"
+                className="px-2.5 py-1 bg-white border border-brand-purple-light rounded-full text-xs text-brand-deep-purple hover:bg-surface-purple-light hover:border-brand-purple transition-colors cursor-pointer"
+                data-testid={`btn-followup-${i}`}
               >
                 {q}
               </button>
             ))}
           </div>
-        )}
-        {currentResponse.assumptions && currentResponse.assumptions.length > 0 && (
-          <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 duration-300" data-testid="assumptions-bar">
+        </div>
+      )}
+
+      {!compact && response.assumptions && response.assumptions.length > 0 && (
+        <div className="px-6 pb-4">
+          <div className="flex flex-wrap gap-1.5" data-testid="assumptions-bar">
             <span className="text-xs text-text-secondary font-medium self-center mr-1">Assumptions:</span>
-            {currentResponse.assumptions.map((a, i) => (
-              <span
-                key={i}
-                className="px-3 py-1.5 bg-white border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple hover:border-brand-gold transition-colors cursor-default"
-              >
-                {a.label}: {a.assumed_value || a.value}
-              </span>
-            ))}
+            {response.assumptions.map((a, i) => {
+              const isTimeRange = a.key === "time_range" || (a.label || "").toLowerCase().includes("time");
+              if (isTimeRange && onFollowUpClick) {
+                return (
+                  <select
+                    key={i}
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const chartTitle = response.chart?.title || "the same metric";
+                        onFollowUpClick(`Show ${chartTitle} for ${e.target.value} instead`);
+                        e.target.value = "";
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-white border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple hover:border-brand-gold transition-colors cursor-pointer appearance-none pr-5"
+                    style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23C6A54E'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
+                    data-testid={`assumption-select-${i}`}
+                  >
+                    <option value="" disabled>{a.label}: {a.assumed_value || a.value}</option>
+                    <option value="last 7 days">Last 7 days</option>
+                    <option value="last 30 days">Last 30 days</option>
+                    <option value="last 90 days">Last 90 days</option>
+                    <option value="last 6 months">Last 6 months</option>
+                    <option value="last year">Last year</option>
+                    <option value="year to date">Year to date</option>
+                  </select>
+                );
+              }
+              return (
+                <span
+                  key={i}
+                  className="px-2.5 py-1 bg-white border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple hover:border-brand-gold transition-colors"
+                >
+                  {a.label}: {a.assumed_value || a.value}
+                </span>
+              );
+            })}
           </div>
-        )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface CanvasProps {
+  activeThreadId: string | null;
+  currentResponse: ChartResponse | null;
+  chartPanels: ChartResponse[];
+  isLoading: boolean;
+  clientId?: string;
+  onFollowUpClick?: (question: string) => void;
+  onRemovePanel?: (turnId: string) => void;
+  onClearPanels?: () => void;
+  onLoadDashboard?: (panels: ChartResponse[]) => void;
+}
+
+type LayoutMode = 'single' | 'grid';
+
+export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading, clientId = "", onFollowUpClick, onRemovePanel, onClearPanels, onLoadDashboard }: CanvasProps) => {
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [drillDownMetric, setDrillDownMetric] = useState("");
+  const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('grid');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [savedDashboards, setSavedDashboards] = useState<any[]>([]);
+  const [showLoadMenu, setShowLoadMenu] = useState(false);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
+
+  const handleLoadDashboards = async () => {
+    if (!clientId) return;
+    setLoadingDashboards(true);
+    try {
+      const dashboards = await getDashboards(clientId);
+      setSavedDashboards(dashboards);
+      setShowLoadMenu(true);
+    } catch {
+      setSavedDashboards([]);
+    } finally {
+      setLoadingDashboards(false);
+    }
+  };
+
+  const handleSelectDashboard = (dashboard: any) => {
+    setShowLoadMenu(false);
+    if (onLoadDashboard && dashboard.layout?.length > 0) {
+      const panels: ChartResponse[] = dashboard.layout.map((item: any, idx: number) => ({
+        thread_id: item.turn_id || `loaded-${idx}`,
+        turn_id: item.turn_id || `loaded-${idx}`,
+        chart: item.chart,
+        insight: item.insight,
+        assumptions: item.assumptions,
+      }));
+      onLoadDashboard(panels);
+    }
+  };
+
+  const handleDeleteDashboard = async (e: React.MouseEvent, dashboardId: string) => {
+    e.stopPropagation();
+    if (!clientId) return;
+    try {
+      await deleteDashboard(clientId, dashboardId);
+      setSavedDashboards(prev => prev.filter(d => d.id !== dashboardId));
+    } catch {}
+  };
+
+  const handleSaveDashboard = async () => {
+    if (chartPanels.length === 0 || !clientId) return;
+    setSaving(true);
+    setSaveMsg("");
+    try {
+      const layout = chartPanels.map((p) => ({
+        turn_id: p.turn_id,
+        chart: p.chart,
+        insight: p.insight,
+        assumptions: p.assumptions,
+      }));
+      const title = `Dashboard — ${new Date().toLocaleDateString()} (${chartPanels.length} charts)`;
+      await saveDashboard(clientId, title, layout);
+      setSaveMsg("Saved!");
+      setTimeout(() => setSaveMsg(""), 2000);
+    } catch {
+      setSaveMsg("Save failed");
+      setTimeout(() => setSaveMsg(""), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChartClick = (data: any) => {
+    if (data?.metric) {
+      setDrillDownMetric(data.metric);
+      setDrillDownFilters(data.filters || {});
+      setDrillDownOpen(true);
+    }
+  };
+
+  if (isLoading && chartPanels.length === 0) {
+    return (
+      <div className="bg-surface-off-white flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+        <Loader2 className="w-12 h-12 text-brand-purple animate-spin mb-4" />
+        <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
       </div>
+    );
+  }
+
+  if (chartPanels.length === 0 && (!activeThreadId || activeThreadId === 'new' || !currentResponse)) {
+    return (
+      <div className="bg-surface-off-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 min-h-[400px]">
+        <div className="max-w-md">
+          <img src={emptyStateImg} alt="No Data" className="w-48 h-48 object-contain mx-auto opacity-90 mix-blend-multiply mb-6" />
+          <h1 className="type-h1 text-brand-deep-purple mb-3" data-testid="text-hero-title">
+            Claims Intelligence Layer
+          </h1>
+          <p className="type-body text-brand-purple-secondary mb-8 text-center" data-testid="text-hero-subtitle">
+            Ask questions to build your analytics dashboard. Each chart stays on the canvas so you can compare multiple metrics side by side.
+          </p>
+          <div className="flex flex-wrap gap-2 justify-center opacity-60">
+            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">SLA Breach Rate?</span>
+            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Queue Depth by Region</span>
+            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Cost per Claim</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentResponse?.error && chartPanels.length === 0) {
+    return (
+      <div className="bg-surface-off-white p-4">
+        <div className="bg-white border-l-4 border-status-alert p-6 rounded-r-xl shadow-sm">
+          <h2 className="type-h2 text-brand-deep-purple mb-2">Unable to Process</h2>
+          <p className="type-body text-brand-deep-purple">{currentResponse.error.message}</p>
+          {currentResponse.error.suggestions && (
+            <div className="mt-4">
+              <p className="text-sm text-text-secondary mb-2">Try asking about:</p>
+              <div className="flex flex-wrap gap-2">
+                {currentResponse.error.suggestions.map((s, i) => (
+                  <span key={i} className="px-3 py-1 bg-surface-purple-light rounded-full text-xs text-brand-deep-purple">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isCompact = layoutMode === 'grid' && chartPanels.length > 1;
+
+  return (
+    <div className="space-y-4">
+      {chartPanels.length > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-display font-semibold text-brand-deep-purple">
+              Dashboard
+            </h2>
+            <span className="text-xs text-text-secondary bg-surface-purple-light px-2 py-0.5 rounded-full font-mono">
+              {chartPanels.length} {chartPanels.length === 1 ? 'chart' : 'charts'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-white border border-surface-grey-lavender rounded-lg overflow-hidden">
+              <button
+                onClick={() => setLayoutMode('single')}
+                className={`p-1.5 transition-colors ${layoutMode === 'single' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
+                title="Single column"
+                data-testid="btn-layout-single"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setLayoutMode('grid')}
+                className={`p-1.5 transition-colors ${layoutMode === 'grid' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
+                title="Grid layout"
+                data-testid="btn-layout-grid"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="relative">
+              <button
+                onClick={handleLoadDashboards}
+                disabled={loadingDashboards}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-brand-purple hover:bg-surface-purple-light rounded-lg transition-colors border border-surface-grey-lavender"
+                data-testid="btn-load-dashboard"
+                title="Load saved dashboard"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                {loadingDashboards ? "Loading..." : "Load"}
+              </button>
+              {showLoadMenu && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-surface-grey-lavender rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+                  {savedDashboards.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-text-secondary">No saved dashboards</div>
+                  ) : (
+                    savedDashboards.map((d) => (
+                      <div
+                        key={d.id}
+                        onClick={() => handleSelectDashboard(d)}
+                        className="flex items-center justify-between px-3 py-2 hover:bg-surface-purple-light cursor-pointer group"
+                        data-testid={`dashboard-item-${d.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-brand-deep-purple truncate">{d.title}</div>
+                          <div className="text-[10px] text-text-secondary">
+                            {new Date(d.updatedAt || d.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteDashboard(e, d.id)}
+                          className="ml-2 p-1 text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`btn-delete-dashboard-${d.id}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                  <button
+                    onClick={() => setShowLoadMenu(false)}
+                    className="w-full px-3 py-1.5 text-xs text-text-secondary hover:bg-gray-50 border-t border-surface-grey-lavender"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleSaveDashboard}
+              disabled={saving || chartPanels.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-brand-purple hover:bg-surface-purple-light rounded-lg transition-colors border border-brand-purple-light disabled:opacity-50"
+              data-testid="btn-save-dashboard"
+              title="Save dashboard"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving ? "Saving..." : saveMsg || "Save"}
+            </button>
+            {chartPanels.length > 1 && (
+              <button
+                onClick={onClearPanels}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-surface-grey-lavender"
+                data-testid="btn-clear-all"
+                title="Clear all charts"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear all
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="bg-white rounded-xl border border-brand-purple/20 p-8 flex items-center justify-center animate-pulse">
+          <Loader2 className="w-6 h-6 text-brand-purple animate-spin mr-3" />
+          <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
+        </div>
+      )}
+
+      <div className={`${isCompact ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-4'}`}>
+        {chartPanels.map((panel, idx) => (
+          <ChartPanel
+            key={panel.turn_id}
+            response={panel}
+            compact={isCompact}
+            onRemove={onRemovePanel ? () => onRemovePanel(panel.turn_id) : undefined}
+            onChartClick={handleChartClick}
+            onFollowUpClick={onFollowUpClick}
+            clientId={clientId}
+            isLatest={idx === 0}
+          />
+        ))}
+      </div>
+
+      {currentResponse?.error && chartPanels.length > 0 && (
+        <div className="bg-white border-l-4 border-status-alert p-4 rounded-r-xl shadow-sm">
+          <p className="text-sm text-brand-deep-purple">{currentResponse.error.message}</p>
+        </div>
+      )}
 
       <DrillDownPanel
         isOpen={drillDownOpen}

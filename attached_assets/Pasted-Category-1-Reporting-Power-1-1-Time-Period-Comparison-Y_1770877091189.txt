@@ -1,0 +1,111 @@
+Category 1: Reporting Power
+1.1 Time-Period Comparison (YoY, MoM, WoW)
+What: Execute side-by-side comparisons (e.g., "SLA breach rate this month vs last month").
+Current gap: intent_type: "compare" is parsed and merged into context, but the query compiler never runs a second query or produces dual-series chart data.
+Implementation:
+Extend server/engine/queryCompiler.ts to detect comparison in context.
+When comparison.type === "period" and comparison.offset (e.g., -1_month), run the same metric query twice with offset date ranges.
+Merge results into { labels, datasets: [currentSeries, comparisonSeries] } for line/bar charts.
+Update server/llm/insightGenerator.ts to reference both series in the insight.
+Effort: Medium (2–3 days).
+1.2 Multi-Metric Dashboards / Saved Views
+What: Users save a set of charts (e.g., "Executive Dashboard" = queue depth + SLA breach rate + cost per claim) and reload them in one view.
+Implementation:
+New table: saved_dashboards (id, client_id, user_id, name, chart_configs JSONB, created_at).
+Chart config: { metric_slug, dimensions, filters, time_range, chart_type }.
+API: POST/GET/DELETE /api/dashboards.
+New frontend view: Dashboard tab or modal that renders multiple charts in a grid (2x2 or 3x2), each calling the ask pipeline or a lightweight GET /api/metric-data endpoint.
+Effort: Medium–High (3–5 days).
+1.3 Scheduled Reports (Email / PDF)
+What: Users schedule recurring reports (daily/weekly) to be emailed or generated as PDF.
+Implementation:
+Use existing scheduled_reports table (add migration if missing).
+Cron job or Supabase Edge Function: fetch schedule, run morning brief or metric queries, generate HTML/PDF (e.g., puppeteer or @react-pdf/renderer), send via SMTP or Resend.
+UI: Settings page to create/edit schedules (client, frequency, recipients, metrics or brief type).
+Effort: High (5–7 days).
+1.4 Chart-to-PDF / PNG Export
+What: Export the current chart as a PNG or PDF (not just data).
+Implementation:
+PNG: Use Recharts' toDataURL() on the chart container or html2canvas. Add "Export PNG" to ExportMenu.tsx.
+PDF: Use jsPDF + html2canvas to capture chart + insight card, or server-side puppeteer for multi-page PDFs.
+Effort: Low (1 day).
+Category 2: Chart & Data Variety
+2.1 True Stacked Bar Chart
+Current gap: Canvas.tsx accepts stacked_bar but renders as regular bar (no stackId).
+Implementation:
+In DynamicChart, when type === 'stacked_bar', add stackId="stack" to each Bar and ensure datasets produce stacked series.
+Effort: Low (half day).
+2.2 KPI Cards / Sparklines
+What: Compact KPI cards (e.g., "Queue Depth: 42" with a mini sparkline) for dashboards or the morning brief.
+Implementation:
+New component KPICard with value, label, trend, optional sparklineData.
+Add to ContextBar, MorningBrief, or a dedicated KPI strip. Backend: lightweight endpoint returning KPIs for a metric over last N days.
+Effort: Low (1 day).
+2.3 Heatmaps (e.g., Claims by Region × Peril)
+What: 2D heatmap: rows = region, columns = peril, color = count.
+Implementation:
+New chart type heatmap in intent parser and validator.
+Query compiler: build SQL with GROUP BY dimension1, dimension2.
+New Recharts-based or custom heatmap component (e.g., react-heatmap-grid or SVG).
+Effort: Medium (2 days).
+2.4 Waterfall Charts (e.g., Claim Stage Flow)
+What: Waterfall showing cumulative flow from FNOL → Investigation → Settlement.
+Implementation:
+New metric or chart type waterfall. Data shape: { labels, startValues, deltas }.
+Custom component or Recharts variant.
+Effort: Medium (2 days).
+Category 3: Collaboration & Sharing
+3.1 Thread Sharing
+What: Share a thread (with charts and insights) via link or email.
+Implementation:
+Use thread_shares table. API: POST /api/threads/:id/share creates share record with token, returns URL.
+Public route: GET /share/:token renders read-only view of thread (no edit, no ask).
+Effort: Medium (2–3 days).
+3.2 Thread Annotations
+What: Add notes or highlights to specific turns.
+Implementation:
+Use thread_annotations table. API: CRUD for annotations linked to thread_id + turn_id.
+UI: Annotation icon on each turn, popover/modal to add/view annotations.
+Effort: Medium (2 days).
+Category 4: Automation & Intelligence
+4.1 Wire Query Cache into Ask Pipeline
+What: Cache metric query results by (metric_slug, client_id, filters, time_range) to reduce DB load and latency.
+Implementation:
+In server/routes.ts /api/ask handler, before executeMetricQuery, call queryCache.getCachedResult(cacheKey). If hit, skip SQL and use cached data for chart + insight.
+After fresh query, call queryCache.setCachedResult(...) with TTL (e.g., 15 min).
+Effort: Low (1 day).
+4.2 Alert Execution & Notifications
+What: Periodically evaluate alert rules and send notifications when thresholds are breached.
+Implementation:
+Cron/Edge Function: run anomaly detection or metric queries, compare to alert_rules, trigger notifications.
+Notification channels: email (Resend/SendGrid), Slack webhook, or generic webhook. Store in notification_channels (or add to alert_rules).
+UI: Alert history panel ("Last 7 days: 3 alerts fired").
+Effort: Medium–High (3–4 days).
+4.3 Follow-Up Suggestions (LLM)
+What: After each answer, suggest related questions (e.g., "You might also ask: How does this compare to last quarter?").
+Implementation:
+Extend insightGenerator.ts or add a third LLM call to generate 2–3 suggested follow-ups from the current context.
+Return suggestions: string[] in the ask response. Render as clickable chips in ChatPanel.tsx or below the chart.
+Effort: Low–Medium (1–2 days).
+Category 5: UX & Accessibility
+5.1 Chart Type Switcher
+What: User can toggle chart type (bar ↔ line ↔ pie) without re-asking.
+Implementation:
+Add dropdown/buttons in Canvas.tsx next to the chart title. On change, re-render with new type using same currentResponse.chart.data (formats are compatible).
+Effort: Low (half day).
+5.2 Filter Pills (Editable Assumptions)
+What: Make assumption pills editable; changing a value refines the query.
+Implementation:
+Assumptions already have editable flag. Add onChange handler that calls askQuestion with refined intent (e.g., change time range to "last_7_days").
+Requires mapping assumption keys back to intent fields.
+Effort: Medium (1–2 days).
+5.3 Natural Language Refinement
+What: "Show me that by adjuster" or "Narrow to water damage only" refines the current chart.
+Implementation:
+Intent parser already supports refine. Ensure context is passed correctly and the merge logic handles partial updates. Likely already works; validate with tests.
+Effort: Low (validation + fixes).
+5.4 Dark Mode / Theme Toggle
+What: User preference for light/dark theme.
+Implementation:
+Tailwind dark mode + prefers-color-scheme or manual toggle. Persist in localStorage. Update chart colors for dark backgrounds.
+Effort: Low (1 day).

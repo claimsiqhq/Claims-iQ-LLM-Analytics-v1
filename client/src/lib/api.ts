@@ -183,6 +183,30 @@ export async function deleteAnnotation(threadId: string, annotationId: string): 
   if (!res.ok) throw new Error("Failed to delete annotation");
 }
 
+// Dashboards
+export async function getDashboards(clientId: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/dashboards?client_id=${clientId}`);
+  if (!res.ok) throw new Error("Failed to load dashboards");
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function saveDashboard(clientId: string, title: string, layout: any[]): Promise<any> {
+  const res = await fetch(`${API_BASE}/dashboards?client_id=${clientId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, layout }),
+  });
+  if (!res.ok) throw new Error("Failed to save dashboard");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function deleteDashboard(clientId: string, dashboardId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/dashboards/${dashboardId}?client_id=${clientId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete dashboard");
+}
+
 // Ingestion
 export async function ingestPDF(file: File, clientId: string): Promise<any> {
   const formData = new FormData();

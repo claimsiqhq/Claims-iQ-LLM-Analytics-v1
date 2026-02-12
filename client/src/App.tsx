@@ -29,6 +29,7 @@ export interface ChartResponse {
     record_count?: number;
     query_ms?: number;
     llm_ms?: number;
+    cache_hit?: boolean;
   };
   error?: {
     type: string;
@@ -40,6 +41,7 @@ export interface ChartResponse {
 function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [currentResponse, setCurrentResponse] = useState<ChartResponse | null>(null);
+  const [chartPanels, setChartPanels] = useState<ChartResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
 
@@ -50,6 +52,28 @@ function App() {
     setCurrentResponse(response);
     if (response.thread_id) {
       setActiveThreadId(response.thread_id);
+    }
+    if (response.chart) {
+      setChartPanels(prev => {
+        const exists = prev.some(p => p.turn_id === response.turn_id);
+        if (exists) return prev;
+        return [response, ...prev];
+      });
+    }
+  }, []);
+
+  const handleRemovePanel = useCallback((turnId: string) => {
+    setChartPanels(prev => prev.filter(p => p.turn_id !== turnId));
+  }, []);
+
+  const handleClearPanels = useCallback(() => {
+    setChartPanels([]);
+  }, []);
+
+  const handleLoadDashboard = useCallback((panels: ChartResponse[]) => {
+    setChartPanels(panels);
+    if (panels.length > 0) {
+      setCurrentResponse(panels[0]);
     }
   }, []);
 
@@ -78,29 +102,22 @@ function App() {
             onQuestionSubmitted={() => setQuestionToSubmit(null)}
           />
           <main className="flex-1 h-full overflow-y-auto w-full relative">
-            <div className="ml-[360px] pt-14 p-6 space-y-6 max-w-[1000px] mx-auto">
+            <div className="ml-[360px] pt-14 p-6 space-y-6 max-w-[1400px] mx-auto">
               <KPICards clientId={selectedClientId} />
-              {currentResponse?.chart && (
-                <div ref={chartContainerRef}>
-                  <Canvas
-                    activeThreadId={activeThreadId}
-                    currentResponse={currentResponse}
-                    isLoading={isLoading}
-                    clientId={selectedClientId}
-                    onFollowUpClick={(q) => setQuestionToSubmit(q)}
-                  />
-                </div>
-              )}
-              <MorningBrief clientId={selectedClientId} />
-              {!currentResponse?.chart && (
+              <div ref={chartContainerRef}>
                 <Canvas
                   activeThreadId={activeThreadId}
                   currentResponse={currentResponse}
+                  chartPanels={chartPanels}
                   isLoading={isLoading}
                   clientId={selectedClientId}
                   onFollowUpClick={(q) => setQuestionToSubmit(q)}
+                  onRemovePanel={handleRemovePanel}
+                  onClearPanels={handleClearPanels}
+                  onLoadDashboard={handleLoadDashboard}
                 />
-              )}
+              </div>
+              <MorningBrief clientId={selectedClientId} />
             </div>
           </main>
         </div>

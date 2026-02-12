@@ -531,6 +531,44 @@ export function formatChartDataForComparison(
   data: { labels: string[]; datasets: Array<{ label: string; values: number[]; unit: string }> };
   title: string;
 } {
+  const unit = metric.unit || "count";
+  const chartType = intent.chart_type || "bar";
+  const timeLabel = intent.time_range?.value ? ` — ${intent.time_range.value.replace(/_/g, " ")}` : "";
+  const hasDims = rawDataCurrent.some((r) => Object.keys(r).some((k) => k.startsWith("dim_")));
+
+  const parseVal = (row: any) => {
+    const val = parseFloat(row.value || 0);
+    return unit === "percentage" ? Math.round(val * 10000) / 100 : Math.round(val * 100) / 100;
+  };
+
+  const getDimLabel = (row: any) => {
+    const dimKeys = Object.keys(row).filter((k) => k.startsWith("dim_"));
+    if (dimKeys.length === 0) return metric.display_name;
+    return dimKeys.map((k) => String(row[k] ?? "Unknown")).join(" / ");
+  };
+
+  if (hasDims) {
+    const currentMap = new Map<string, number>();
+    rawDataCurrent.forEach((r) => currentMap.set(getDimLabel(r), parseVal(r)));
+    const compMap = new Map<string, number>();
+    rawDataComparison.forEach((r) => compMap.set(getDimLabel(r), parseVal(r)));
+
+    const allLabels = Array.from(new Set([...currentMap.keys(), ...compMap.keys()]));
+    allLabels.sort();
+
+    return {
+      type: chartType,
+      data: {
+        labels: allLabels,
+        datasets: [
+          { label: "Current Period", values: allLabels.map((l) => currentMap.get(l) ?? 0), unit },
+          { label: comparisonLabel, values: allLabels.map((l) => compMap.get(l) ?? 0), unit },
+        ],
+      },
+      title: `${metric.display_name} vs ${comparisonLabel}${timeLabel}`,
+    };
+  }
+
   const avgCurrent =
     rawDataCurrent.length > 0
       ? rawDataCurrent.reduce((s, r) => s + parseFloat(r.value || 0), 0) / rawDataCurrent.length
@@ -539,16 +577,17 @@ export function formatChartDataForComparison(
     rawDataComparison.length > 0
       ? rawDataComparison.reduce((s, r) => s + parseFloat(r.value || 0), 0) / rawDataComparison.length
       : 0;
-  const unit = metric.unit || "count";
-  const chartType = intent.chart_type || metric.default_chart_type;
-  const timeLabel = intent.time_range?.value ? ` — ${intent.time_range.value.replace(/_/g, " ")}` : "";
+
+  const currentVal = unit === "percentage" ? Math.round(avgCurrent * 10000) / 100 : Math.round(avgCurrent * 100) / 100;
+  const compVal = unit === "percentage" ? Math.round(avgComparison * 10000) / 100 : Math.round(avgComparison * 100) / 100;
+
   return {
-    type: chartType === "line" ? "bar" : chartType,
+    type: chartType,
     data: {
       labels: ["Current Period", comparisonLabel],
       datasets: [
-        { label: "Current", values: [Math.round(avgCurrent * 100) / 100], unit },
-        { label: comparisonLabel, values: [Math.round(avgComparison * 100) / 100], unit },
+        { label: "Current", values: [currentVal], unit },
+        { label: comparisonLabel, values: [compVal], unit },
       ],
     },
     title: `${metric.display_name} vs ${comparisonLabel}${timeLabel}`,
