@@ -390,29 +390,106 @@ const METRIC_QUERIES: Record<
     return `SELECT DATE_TRUNC('${timeDim}', c.fnol_date) as dim_0, ${selectExtra}COUNT(*) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.severity IN ('high', 'critical') GROUP BY ${groupBy} ORDER BY dim_0`;
   },
 
-  // Enhanced metrics (documentation, policy, financial)
+  // Enhanced metrics (documentation, policy, financial) — delegated to additions
   photo_count_per_claim: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.photo_count_per_claim(intentToQueryParams(intent, clientId)).sql,
+    ENHANCED_METRIC_QUERIES.photo_count_per_claim?.(intentToQueryParams(intent, clientId))?.sql ||
+    `SELECT 'N/A' as dim_0, 0 as value`,
   areas_documented: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.areas_documented(intentToQueryParams(intent, clientId)).sql,
+    ENHANCED_METRIC_QUERIES.areas_documented?.(intentToQueryParams(intent, clientId))?.sql ||
+    `SELECT 'N/A' as dim_0, 0 as value`,
   damage_type_coverage: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.damage_type_coverage(intentToQueryParams(intent, clientId)).sql,
-  coverage_type_distribution: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.coverage_type_distribution(intentToQueryParams(intent, clientId)).sql,
+    ENHANCED_METRIC_QUERIES.damage_type_coverage?.(intentToQueryParams(intent, clientId))?.sql ||
+    `SELECT 'N/A' as dim_0, 0 as value`,
   endorsement_frequency: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.endorsement_frequency(intentToQueryParams(intent, clientId)).sql,
+    ENHANCED_METRIC_QUERIES.endorsement_frequency?.(intentToQueryParams(intent, clientId))?.sql ||
+    `SELECT 'N/A' as dim_0, 0 as value`,
   roof_coverage_rate: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.roof_coverage_rate(intentToQueryParams(intent, clientId)).sql,
-  estimate_accuracy: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.estimate_accuracy(intentToQueryParams(intent, clientId)).sql,
-  depreciation_ratio: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.depreciation_ratio(intentToQueryParams(intent, clientId)).sql,
-  net_claim_amount_trend: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.net_claim_amount_trend(intentToQueryParams(intent, clientId)).sql,
-  total_expenses_per_claim: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.total_expenses_per_claim(intentToQueryParams(intent, clientId)).sql,
-  expense_type_breakdown: (intent, clientId) =>
-    ENHANCED_METRIC_QUERIES.expense_type_breakdown(intentToQueryParams(intent, clientId)).sql,
+    ENHANCED_METRIC_QUERIES.roof_coverage_rate?.(intentToQueryParams(intent, clientId))?.sql ||
+    `SELECT 'N/A' as dim_0, 0 as value`,
+
+  // Financial metrics using claim_policies, claim_estimates, claim_billing
+  reserve_amount: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", " : "";
+    const groupBy = dimCols.length ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC` : "";
+    return `SELECT ${selectDims}ROUND(AVG(c.reserve_amount)::numeric, 2) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  paid_amount: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", " : "";
+    const groupBy = dimCols.length ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC` : "";
+    return `SELECT ${selectDims}ROUND(AVG(c.paid_amount)::numeric, 2) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  estimate_accuracy: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", " : "";
+    const groupBy = dimCols.length ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC` : "";
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN c.paid_amount > 0 THEN ce.estimated_amount / c.paid_amount ELSE NULL END)::numeric, 4) as value FROM claim_estimates ce JOIN claims c ON ce.claim_id = c.id LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} AND c.paid_amount > 0 ${groupBy}`;
+  },
+
+  depreciation_ratio: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", " : "";
+    const groupBy = dimCols.length ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC` : "";
+    return `SELECT ${selectDims}ROUND(AVG(CASE WHEN ce.replacement_cost > 0 THEN ce.depreciation_amount / ce.replacement_cost ELSE 0 END)::numeric, 4) as value FROM claim_estimates ce JOIN claims c ON ce.claim_id = c.id LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} ${groupBy}`;
+  },
+
+  coverage_type_distribution: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const extraDims = dims.filter(d => d !== "coverage_type").map(getDimensionColumn);
+    const selectExtra = extraDims.length ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", " : "";
+    const groupBy = ["cp.coverage_type", ...extraDims].join(", ");
+    return `SELECT cp.coverage_type as dim_0, ${selectExtra}COUNT(*) as value FROM claim_policies cp JOIN claims c ON cp.claim_id = c.id LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY ${groupBy} ORDER BY value DESC`;
+  },
+
+  total_expenses_per_claim: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    if (dims.includes("expense_category")) {
+      return `SELECT cb.expense_category as dim_0, ROUND(AVG(cb.amount)::numeric, 2) as value FROM claim_billing cb JOIN claims c ON cb.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cb.expense_category ORDER BY value DESC`;
+    }
+    if (dims.includes("vendor_name")) {
+      return `SELECT cb.vendor_name as dim_0, ROUND(SUM(cb.amount)::numeric, 2) as value FROM claim_billing cb JOIN claims c ON cb.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cb.vendor_name ORDER BY value DESC`;
+    }
+    const dimCols = dims.map(getDimensionColumn);
+    const selectDims = dimCols.length ? dimCols.map((d, i) => `${d} as dim_${i}`).join(", ") + ", " : "";
+    const groupBy = dimCols.length ? `GROUP BY ${dimCols.join(", ")} ORDER BY value DESC` : "";
+    return `SELECT ${selectDims}ROUND(AVG(total)::numeric, 2) as value FROM (SELECT cb.claim_id, SUM(cb.amount) as total FROM claim_billing cb JOIN claims c ON cb.claim_id = c.id LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cb.claim_id) sub ${groupBy}`;
+  },
+
+  expense_type_breakdown: (intent, clientId) => {
+    return `SELECT cb.expense_category as dim_0, ROUND(SUM(cb.amount)::numeric, 2) as value FROM claim_billing cb JOIN claims c ON cb.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cb.expense_category ORDER BY value DESC`;
+  },
+
+  net_claim_amount_trend: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    const { conditions } = buildWhereClause(intent, clientId);
+    const timeDim = dims.includes("month") ? "month" : dims.includes("week") ? "week" : "month";
+    const extraDims = dims.filter(d => !["day", "week", "month"].includes(d)).map(getDimensionColumn);
+    const selectExtra = extraDims.length ? extraDims.map((d, i) => `${d} as dim_${i + 1}`).join(", ") + ", " : "";
+    const groupBy = [`DATE_TRUNC('${timeDim}', c.fnol_date)`, ...extraDims].join(", ");
+    return `SELECT DATE_TRUNC('${timeDim}', c.fnol_date) as dim_0, ${selectExtra}ROUND(SUM(c.paid_amount)::numeric, 2) as value FROM claims c LEFT JOIN adjusters a ON c.assigned_adjuster_id = a.id AND a.client_id = c.client_id WHERE ${conditions.replace(/client_id/g, "c.client_id")} GROUP BY ${groupBy} ORDER BY dim_0`;
+  },
+
+  deductible_analysis: (intent, clientId) => {
+    const dims = intent.dimensions || [];
+    if (dims.includes("policy_type")) {
+      return `SELECT cp.policy_type as dim_0, ROUND(AVG(cp.deductible)::numeric, 2) as value FROM claim_policies cp JOIN claims c ON cp.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cp.policy_type ORDER BY value DESC`;
+    }
+    if (dims.includes("coverage_type")) {
+      return `SELECT cp.coverage_type as dim_0, ROUND(AVG(cp.deductible)::numeric, 2) as value FROM claim_policies cp JOIN claims c ON cp.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}' GROUP BY cp.coverage_type ORDER BY value DESC`;
+    }
+    return `SELECT ROUND(AVG(cp.deductible)::numeric, 2) as value FROM claim_policies cp JOIN claims c ON cp.claim_id = c.id WHERE c.client_id = '${sanitize(clientId)}'`;
+  },
 };
 
 export async function executeMetricQuery(

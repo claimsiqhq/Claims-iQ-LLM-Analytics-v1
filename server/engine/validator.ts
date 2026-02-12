@@ -19,7 +19,8 @@ const VALID_CHART_TYPES = [
 const VALID_FILTER_FIELDS = [
   "peril", "severity", "region", "status", "current_stage",
   "sla_breached", "state_code", "adjuster", "team", "issue_type",
-  "stage", "model", "decision_type",
+  "stage", "model", "decision_type", "cat_code", "coverage_type",
+  "policy_type", "expense_category", "billing_type", "vendor_name",
 ];
 
 export function validateIntent(

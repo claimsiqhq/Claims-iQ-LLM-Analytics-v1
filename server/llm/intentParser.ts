@@ -51,12 +51,17 @@ You MUST output ONLY valid JSON. No markdown, no explanation, no extra text.
 ${metricList}
 
 ## Available Filter Fields
-- peril: "Water Damage", "Fire", "Theft", "Wind/Hail", "Liability"
+- peril: "Tornado", "Wind", "Wind/Hail", "Hail", "Water", "Water Backup", "Water - Plumbing", "Falling Object", "Wear and Tear", "Other"
 - severity: "low", "medium", "high", "critical"
-- region: "Southeast", "Northeast", "Midwest", "West"
+- region: "Midwest", "Northeast", "South"
+- state_code: "MO", "PA", "OH", "IL", "GA", "CT", "KS", "MI", "NJ", "TN", "TX", "WI", "KY"
 - status: "open", "in_progress", "review", "closed", "reopened"
-- current_stage: "fnol", "investigation", "evaluation", "negotiation", "settlement", "closed"
+- current_stage: "fnol", "investigation", "evaluation", "negotiation", "settlement", "closed", "review"
 - sla_breached: true, false
+- cat_code: catastrophe event code (e.g. "PCS2524", "PCS2534")
+- coverage_type: "Dwelling", "Contents", etc. (from claim_policies)
+- policy_type: "HO 03", etc. (from claim_policies)
+- expense_category: "Property Appraisal", "Travel Expense", etc. (from claim_billing)
 
 ## Available Operators
 eq, neq, gt, gte, lt, lte, in, not_in, between
