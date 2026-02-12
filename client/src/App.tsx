@@ -196,6 +196,7 @@ function App() {
               style={!isMobile ? { marginLeft: `${chatWidth}px` } : undefined}
             >
               <KPICards clientId={selectedClientId} />
+              <MorningBrief clientId={selectedClientId} />
               <div ref={chartContainerRef}>
                 <Canvas
                   activeThreadId={activeThreadId}
@@ -210,7 +211,6 @@ function App() {
                   isMobile={isMobile}
                 />
               </div>
-              <MorningBrief clientId={selectedClientId} />
             </div>
           </main>
         </div>
