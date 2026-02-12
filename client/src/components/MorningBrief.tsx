@@ -176,8 +176,8 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
 
       {briefData.metrics.length > 0 && (
         <div className="px-4 md:px-6 py-3 md:py-4 bg-surface-off-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Key Metrics</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3 text-center">Key Metrics</p>
+          <div className="flex flex-wrap justify-center gap-3">
             {briefData.metrics.map((metric, idx) => (
               <div key={idx} className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600" data-testid={`card-metric-${idx}`}>
                 <p className="text-xs text-text-secondary font-medium">{metric.label}</p>
