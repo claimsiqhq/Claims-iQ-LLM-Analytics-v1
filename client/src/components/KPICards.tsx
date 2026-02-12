@@ -37,7 +37,7 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
   if (loading || kpis.length === 0) return null;
 
   return (
-    <div className="flex gap-3 mb-6 flex-wrap">
+    <div className="flex gap-3 mb-6 flex-wrap justify-center">
       {kpis.map((kpi, idx) => (
         <Card
           key={idx}

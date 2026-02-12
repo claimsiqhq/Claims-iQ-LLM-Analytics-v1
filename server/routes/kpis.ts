@@ -12,8 +12,9 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
     const today = new Date().toISOString().split("T")[0];
     const todayStart = today + "T00:00:00";
     const todayEnd = today + "T23:59:59";
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const [queueRes, slaRes, claimsRes] = await Promise.all([
+    const [queueRes, slaRes, claimsWeekRes, closedWeekRes] = await Promise.all([
       supabase.rpc("execute_raw_sql", {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
@@ -33,15 +34,25 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${clientId.replace(/'/g, "''")}'
-            AND c.fnol_date >= '${todayStart}'
+            AND c.fnol_date >= '${weekAgo}'
             AND c.fnol_date <= '${todayEnd}'
+        `,
+      }),
+      supabase.rpc("execute_raw_sql", {
+        query_text: `
+          SELECT COUNT(*)::int as value FROM claims c
+          WHERE c.client_id = '${clientId.replace(/'/g, "''")}'
+            AND c.closed_at IS NOT NULL
+            AND c.closed_at >= '${weekAgo}T00:00:00'
+            AND c.closed_at <= '${todayEnd}T23:59:59'
         `,
       }),
     ]);
 
     const queueDepth = (queueRes.data as any)?.[0]?.value ?? 0;
     const slaBreachRate = (slaRes.data as any)?.[0]?.value ?? 0;
-    const claimsToday = (claimsRes.data as any)?.[0]?.value ?? 0;
+    const claimsThisWeek = (claimsWeekRes.data as any)?.[0]?.value ?? 0;
+    const closedThisWeek = (closedWeekRes.data as any)?.[0]?.value ?? 0;
 
     res.json({
       success: true,
@@ -54,9 +65,15 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           trend: "neutral" as const,
         },
         {
-          label: "Claims Today",
-          value: claimsToday,
-          unit: "",
+          label: "Claims This Week",
+          value: claimsThisWeek,
+          unit: "claims",
+          trend: "neutral" as const,
+        },
+        {
+          label: "Closed This Week",
+          value: closedThisWeek,
+          unit: "claims",
           trend: "neutral" as const,
         },
       ],

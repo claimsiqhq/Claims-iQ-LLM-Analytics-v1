@@ -78,7 +78,7 @@ function App() {
             onQuestionSubmitted={() => setQuestionToSubmit(null)}
           />
           <main className="flex-1 h-full overflow-y-auto w-full relative">
-            <div className="ml-[360px] pt-14 p-6 space-y-6">
+            <div className="ml-[360px] pt-14 p-6 space-y-6 max-w-[1000px] mx-auto">
               <KPICards clientId={selectedClientId} />
               {currentResponse?.chart && (
                 <div ref={chartContainerRef}>
