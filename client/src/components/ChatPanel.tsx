@@ -297,9 +297,10 @@ interface ChatPanelProps {
   clientId?: string;
   questionToSubmit?: string | null;
   onQuestionSubmitted?: () => void;
+  width?: number;
 }
 
-export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId, questionToSubmit, onQuestionSubmitted }: ChatPanelProps) => {
+export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId, questionToSubmit, onQuestionSubmitted, width = 360 }: ChatPanelProps) => {
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages] = useState<MessageData[]>([]);
@@ -511,7 +512,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   ];
 
   return (
-    <div className="fixed top-14 bottom-0 left-0 w-[360px] bg-surface-purple-light border-r border-surface-grey-lavender flex flex-col z-40 transition-all duration-300">
+    <div className="fixed top-14 bottom-0 left-0 bg-surface-purple-light border-r border-surface-grey-lavender flex flex-col z-40" style={{ width: `${width}px` }}>
       <div className="p-4 bg-surface-purple-light shrink-0 border-b border-surface-grey-lavender/50 flex items-center h-[72px]">
         {view === 'list' ? (
           <button

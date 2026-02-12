@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ContextBar } from "@/components/ContextBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Canvas } from "@/components/Canvas";
@@ -38,6 +38,10 @@ export interface ChartResponse {
   };
 }
 
+const MIN_CHAT_WIDTH = 240;
+const MAX_CHAT_WIDTH = 600;
+const DEFAULT_CHAT_WIDTH = 360;
+
 function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [currentResponse, setCurrentResponse] = useState<ChartResponse | null>(null);
@@ -47,6 +51,41 @@ function App() {
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [questionToSubmit, setQuestionToSubmit] = useState<string | null>(null);
+
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(DEFAULT_CHAT_WIDTH);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = chatWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [chatWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = e.clientX - dragStartX.current;
+      const newWidth = Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, dragStartWidth.current + delta));
+      setChatWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const handleNewResponse = useCallback((response: ChartResponse) => {
     setCurrentResponse(response);
@@ -100,9 +139,18 @@ function App() {
             clientId={selectedClientId}
             questionToSubmit={questionToSubmit}
             onQuestionSubmitted={() => setQuestionToSubmit(null)}
+            width={chatWidth}
           />
+          <div
+            data-testid="chat-resize-handle"
+            onMouseDown={handleResizeStart}
+            className="fixed top-14 bottom-0 z-50 w-1.5 cursor-col-resize group hover:bg-brand-purple/20 active:bg-brand-purple/30 transition-colors"
+            style={{ left: `${chatWidth - 3}px` }}
+          >
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-transparent group-hover:bg-brand-purple/40 transition-colors" />
+          </div>
           <main className="flex-1 h-full overflow-y-auto w-full relative">
-            <div className="ml-[360px] pt-14 p-6 space-y-6 max-w-[1400px] mx-auto">
+            <div className="pt-14 p-6 space-y-6 max-w-[1400px] mx-auto" style={{ marginLeft: `${chatWidth}px` }}>
               <KPICards clientId={selectedClientId} />
               <div ref={chartContainerRef}>
                 <Canvas
