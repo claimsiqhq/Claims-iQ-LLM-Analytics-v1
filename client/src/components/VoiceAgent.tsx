@@ -576,9 +576,3 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
     </div>
   );
 };
-p>
-        )}
-      </div>
-    </div>
-  );
-};
