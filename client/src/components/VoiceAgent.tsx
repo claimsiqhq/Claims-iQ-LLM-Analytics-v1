@@ -158,7 +158,11 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
       setStatus("connecting");
       setErrorMessage("");
 
-      const tokenRes = await fetch("/api/voice/token", { method: "POST" });
+      const tokenRes = await fetch("/api/voice/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId }),
+      });
       if (!tokenRes.ok) {
         const err = await tokenRes.json();
         throw new Error(err.error || "Failed to get voice session token");

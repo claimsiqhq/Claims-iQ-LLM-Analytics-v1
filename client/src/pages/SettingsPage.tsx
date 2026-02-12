@@ -422,7 +422,7 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [clientId]);
 
   const handleSave = async () => {
     await fetch("/api/settings/preferences", {
@@ -561,6 +561,72 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
                 <SelectItem value="600">Every 10 minutes</SelectItem>
                 <SelectItem value="1800">Every 30 minutes</SelectItem>
                 <SelectItem value="0">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-brand-deep-purple dark:text-white">
+            <Mic className="w-5 h-5 text-brand-purple" />
+            Voice Agent
+          </CardTitle>
+          <CardDescription>
+            OpenAI Realtime API voice and turn detection settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="voice-voice">Voice</Label>
+            <Select value={voiceVoice} onValueChange={setVoiceVoice}>
+              <SelectTrigger id="voice-voice" data-testid="select-voice-voice">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  { value: "ash", label: "Ash" },
+                  { value: "coral", label: "Coral" },
+                  { value: "shimmer", label: "Shimmer" },
+                  { value: "echo", label: "Echo" },
+                  { value: "fable", label: "Fable" },
+                  { value: "onyx", label: "Onyx" },
+                  { value: "alloy", label: "Alloy" },
+                  { value: "nova", label: "Nova" },
+                ].map((v) => (
+                  <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Turn sensitivity (higher = more responsive)</Label>
+            <Select value={String(voiceTurnSensitivity)} onValueChange={(v) => setVoiceTurnSensitivity(Number(v))}>
+              <SelectTrigger data-testid="select-voice-sensitivity">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0.5">Low (0.5)</SelectItem>
+                <SelectItem value="0.7">Medium-Low (0.7)</SelectItem>
+                <SelectItem value="0.8">Medium (0.8)</SelectItem>
+                <SelectItem value="0.9">Medium-High (0.9)</SelectItem>
+                <SelectItem value="0.95">High (0.95)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="voice-silence">Silence duration (ms) before turn end</Label>
+            <Select value={String(voiceSilenceDuration)} onValueChange={(v) => setVoiceSilenceDuration(Number(v))}>
+              <SelectTrigger id="voice-silence" data-testid="select-voice-silence">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="400">400 ms</SelectItem>
+                <SelectItem value="600">600 ms</SelectItem>
+                <SelectItem value="800">800 ms</SelectItem>
+                <SelectItem value="1000">1000 ms</SelectItem>
+                <SelectItem value="1200">1200 ms</SelectItem>
               </SelectContent>
             </Select>
           </div>

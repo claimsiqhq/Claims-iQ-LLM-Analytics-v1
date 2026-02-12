@@ -411,3 +411,25 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_reports_client ON scheduled_reports(cli
 CREATE INDEX IF NOT EXISTS idx_scheduled_reports_next ON scheduled_reports(next_run_at) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_saved_dashboards_client ON saved_dashboards(client_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_client ON api_keys(client_id);
+
+-- 17. Client preferences (chart defaults, theme, voice agent settings)
+CREATE TABLE IF NOT EXISTS client_preferences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE UNIQUE,
+  default_chart_type TEXT DEFAULT 'bar',
+  default_time_range TEXT DEFAULT '30d',
+  theme TEXT DEFAULT 'system',
+  notifications_enabled BOOLEAN DEFAULT TRUE,
+  auto_refresh_interval INTEGER DEFAULT 300,
+  voice_voice TEXT DEFAULT 'ash',
+  voice_turn_sensitivity DECIMAL(3,2) DEFAULT 0.8,
+  voice_silence_duration INTEGER DEFAULT 800,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_client_preferences_client ON client_preferences(client_id);
+
+-- Add voice columns if table already exists without them
+ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_voice TEXT DEFAULT 'ash';
+ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_turn_sensitivity DECIMAL(3,2) DEFAULT 0.8;
+ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_silence_duration INTEGER DEFAULT 800;
