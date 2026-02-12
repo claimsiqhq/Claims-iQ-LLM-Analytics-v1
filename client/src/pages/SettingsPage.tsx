@@ -436,6 +436,9 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
           theme: theme || "system",
           notifications_enabled: notifications,
           auto_refresh_interval: autoRefresh,
+          voice_voice: voiceVoice,
+          voice_turn_sensitivity: voiceTurnSensitivity,
+          voice_silence_duration: voiceSilenceDuration,
         },
       }),
     });
