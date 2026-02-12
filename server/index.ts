@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { ensureDefaultUser } from "./seedUser";
+import { seedDefaultAlertRules } from "./engine/anomalyDetector";
+import { getDefaultClientId } from "./config/defaults";
 
 const app = express();
 const httpServer = createServer(app);
@@ -100,8 +102,12 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       ensureDefaultUser()
-        .then((uid) => log(`Default user ready: ${uid}`, "seed"))
-        .catch((err) => log(`Default user seed failed: ${err.message}`, "seed"));
+        .then((uid) => {
+          log(`Default user ready: ${uid}`, "seed");
+          return getDefaultClientId();
+        })
+        .then((clientId) => seedDefaultAlertRules(clientId))
+        .catch((err) => log(`Startup seed failed: ${err.message}`, "seed"));
     },
   );
 })();

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../config/supabase";
-import { getDefaultClientId } from "../config/defaults";
+import { getDefaultClientId, getDefaultUserId } from "../config/defaults";
 
 export const scheduledReportsRouter = Router();
 
@@ -51,10 +51,13 @@ scheduledReportsRouter.post("/api/scheduled-reports", async (req: Request, res: 
       });
     }
 
+    const userId = (req.headers["x-user-id"] as string) || await getDefaultUserId();
+
     const { data, error } = await supabase
       .from("scheduled_metric_reports")
       .insert({
         client_id: clientId,
+        user_id: userId,
         title,
         metric_slug: metricSlug,
         schedule_cron: scheduleCron,

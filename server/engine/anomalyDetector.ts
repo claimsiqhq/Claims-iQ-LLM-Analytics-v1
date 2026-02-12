@@ -1,9 +1,9 @@
 import { supabase } from "../config/supabase";
 import { getMetrics } from "./metricRegistry";
+import { executeMetricQuery } from "./queryCompiler";
+import { getMetricBySlug } from "./metricRegistry";
+import type { ParsedIntent } from "../llm/intentParser";
 
-/**
- * Represents a detected anomaly event
- */
 export interface AnomalyEvent {
   metricSlug: string;
   direction: "up" | "down";
@@ -15,28 +15,17 @@ export interface AnomalyEvent {
   detectedAt: Date;
 }
 
-/**
- * Options for anomaly detection
- */
 export interface AnomalyDetectionOptions {
   metricSlugs?: string[];
   lookbackDays?: number;
   threshold?: number;
 }
 
-/**
- * Daily metric snapshot from the database
- */
 interface DailyMetricValue {
   date: string;
   value: number;
 }
 
-/**
- * Anomaly detection engine using Z-score statistical method.
- * Uses metric_definitions and computes daily values from claims data
- * when metric_daily_values table is not available.
- */
 export class AnomalyDetector {
   async detectAnomalies(
     clientId: string,
@@ -54,7 +43,9 @@ export class AnomalyDetector {
       const metrics = await getMetrics();
       const metricsToAnalyze = metricSlugs?.length
         ? metrics.filter((m) => metricSlugs.includes(m.slug))
-        : metrics.slice(0, 5); // Default: analyze first 5 metrics
+        : metrics.filter((m) =>
+            ["claims_opened", "avg_cycle_time", "sla_breach_rate", "claims_closed", "avg_reserve_accuracy"].includes(m.slug)
+          );
 
       if (metricsToAnalyze.length === 0) return [];
 
@@ -88,44 +79,64 @@ export class AnomalyDetector {
     }
   }
 
-  /**
-   * Analyzes a metric by querying claims data for daily aggregates
-   */
   private async analyzeMetricFromClaims(
     clientId: string,
     metricSlug: string,
     lookbackDays: number,
     threshold: number
   ): Promise<AnomalyEvent | null> {
+    const metrics = await getMetrics();
+    const metric = getMetricBySlug(metrics, metricSlug);
+    if (!metric) return null;
+
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - lookbackDays);
 
-    const endDateStr = endDate.toISOString().split("T")[0];
-    const startDateStr = startDate.toISOString().split("T")[0];
+    const weeklyValues: number[] = [];
+    const weeksToAnalyze = Math.floor(lookbackDays / 7);
+    if (weeksToAnalyze < 3) return null;
 
-    // Query daily aggregates from claims for simple metrics
-    const { data: dailyValues, error } = await supabase.rpc("execute_raw_sql", {
-      query_text: `
-        SELECT DATE(c.fnol_date)::text as date, COUNT(*)::float as value
-        FROM claims c
-        WHERE c.client_id = '${clientId.replace(/'/g, "''")}'
-          AND c.fnol_date >= '${startDateStr}'
-          AND c.fnol_date <= '${endDateStr}'
-        GROUP BY DATE(c.fnol_date)
-        ORDER BY date ASC
-      `,
-    });
+    for (let w = 0; w < weeksToAnalyze; w++) {
+      const weekEnd = new Date(endDate);
+      weekEnd.setDate(weekEnd.getDate() - w * 7);
+      const weekStart = new Date(weekEnd);
+      weekStart.setDate(weekStart.getDate() - 7);
 
-    if (error || !dailyValues || !Array.isArray(dailyValues)) {
-      return null;
+      const intent: ParsedIntent = {
+        intent_type: "query",
+        metric: { slug: metricSlug, display_name: metric.display_name },
+        dimensions: [],
+        filters: [],
+        time_range: {
+          type: "absolute",
+          value: "custom",
+          start: weekStart.toISOString().split("T")[0],
+          end: weekEnd.toISOString().split("T")[0],
+        },
+        comparison: null,
+        chart_type: "bar",
+        sort: null,
+        limit: null,
+        assumptions: [],
+        confidence: 1,
+      };
+
+      try {
+        const result = await executeMetricQuery(intent, metric, clientId);
+        const row = result?.data?.[0];
+        const value = row?.value ?? (row ? Object.values(row)[0] : 0);
+        const numVal = typeof value === "number" ? value : parseFloat(String(value)) || 0;
+        weeklyValues.unshift(numVal);
+      } catch {
+        weeklyValues.unshift(0);
+      }
     }
 
-    const values = dailyValues as DailyMetricValue[];
-    if (values.length < 3) return null;
+    if (weeklyValues.length < 3) return null;
 
-    const currentValue = values[values.length - 1].value;
-    const baselineValues = values.slice(0, -1).map((v) => v.value);
+    const currentValue = weeklyValues[weeklyValues.length - 1];
+    const baselineValues = weeklyValues.slice(0, -1);
     const baselineMean =
       baselineValues.reduce((a, b) => a + b, 0) / baselineValues.length;
     const variance =
@@ -179,6 +190,82 @@ export class AnomalyDetector {
       console.error("Failed to store anomalies:", error.message);
     }
   }
+
 }
 
 export const anomalyDetector = new AnomalyDetector();
+
+export async function seedDefaultAlertRules(clientId: string, userId?: string): Promise<void> {
+  const { data: existing } = await supabase
+    .from("alert_rules")
+    .select("id")
+    .eq("client_id", clientId)
+    .limit(1);
+
+  if (existing && existing.length > 0) return;
+
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id")
+      .limit(1);
+    resolvedUserId = users?.[0]?.id;
+    if (!resolvedUserId) return;
+  }
+
+  const defaultRules = [
+    {
+      client_id: clientId,
+      user_id: resolvedUserId,
+      metric_slug: "sla_breach_rate",
+      condition: "gt",
+      threshold: 20,
+      severity: "critical",
+      is_active: true,
+    },
+    {
+      client_id: clientId,
+      user_id: resolvedUserId,
+      metric_slug: "cycle_time_e2e",
+      condition: "gt",
+      threshold: 45,
+      severity: "warning",
+      is_active: true,
+    },
+    {
+      client_id: clientId,
+      user_id: resolvedUserId,
+      metric_slug: "human_override_rate",
+      condition: "gt",
+      threshold: 50,
+      severity: "warning",
+      is_active: true,
+    },
+    {
+      client_id: clientId,
+      user_id: resolvedUserId,
+      metric_slug: "cost_per_claim",
+      condition: "gt",
+      threshold: 0.05,
+      severity: "info",
+      is_active: true,
+    },
+    {
+      client_id: clientId,
+      user_id: resolvedUserId,
+      metric_slug: "re_review_count",
+      condition: "gt",
+      threshold: 10,
+      severity: "warning",
+      is_active: true,
+    },
+  ];
+
+  const { error } = await supabase.from("alert_rules").insert(defaultRules);
+  if (error) {
+    console.error("Failed to seed alert rules:", error.message);
+  } else {
+    console.log(`Seeded ${defaultRules.length} default alert rules`);
+  }
+}

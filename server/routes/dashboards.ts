@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../config/supabase";
-import { getDefaultClientId } from "../config/defaults";
+import { getDefaultClientId, getDefaultUserId } from "../config/defaults";
 
 export const dashboardsRouter = Router();
 
@@ -47,10 +47,13 @@ dashboardsRouter.post("/api/dashboards", async (req: Request, res: Response) => 
       });
     }
 
+    const userId = (req.headers["x-user-id"] as string) || await getDefaultUserId();
+
     const { data, error } = await supabase
       .from("saved_dashboards")
       .insert({
         client_id: clientId,
+        user_id: userId,
         title,
         layout: layout || [],
       })

@@ -10,6 +10,15 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+  getAlertRules,
+  deleteAlertRule,
+  getScheduledReports,
+  createScheduledReport,
+  toggleScheduledReport,
+  deleteScheduledReport,
+  getMetrics,
+} from "@/lib/api";
+import {
   Upload,
   Database,
   Settings,
@@ -87,7 +96,7 @@ export function SettingsPage({ onBack, clientId }: { onBack: () => void; clientI
 
       <div className="pt-20 max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-white dark:bg-gray-800 border border-border p-1 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-1 h-auto">
+          <TabsList className="bg-white dark:bg-gray-800 border border-border p-1 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-1 h-auto">
             <TabsTrigger
               value="data-import"
               className="gap-2 data-[state=active]:bg-brand-purple data-[state=active]:text-white rounded-lg py-2.5 text-sm"
@@ -124,6 +133,15 @@ export function SettingsPage({ onBack, clientId }: { onBack: () => void; clientI
               <span className="hidden sm:inline">AI Models</span>
               <span className="sm:hidden">AI</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="alerts-reports"
+              className="gap-2 data-[state=active]:bg-brand-purple data-[state=active]:text-white rounded-lg py-2.5 text-sm"
+              data-testid="tab-alerts-reports"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="hidden sm:inline">Alerts & Reports</span>
+              <span className="sm:hidden">Alerts</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="data-import">
@@ -137,6 +155,9 @@ export function SettingsPage({ onBack, clientId }: { onBack: () => void; clientI
           </TabsContent>
           <TabsContent value="ai-config">
             <AIConfigSection />
+          </TabsContent>
+          <TabsContent value="alerts-reports">
+            <AlertsReportsSection clientId={clientId} />
           </TabsContent>
         </Tabs>
       </div>
@@ -969,6 +990,284 @@ function AIConfigSection() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AlertsReportsSection({ clientId }: { clientId?: string }) {
+  const [alertRules, setAlertRules] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [metrics, setMetricsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMetric, setNewMetric] = useState("");
+  const [newSchedule, setNewSchedule] = useState("daily");
+  const [newRecipients, setNewRecipients] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const cronMap: Record<string, string> = {
+    daily: "0 8 * * *",
+    weekly: "0 8 * * 1",
+    monthly: "0 8 1 * *",
+  };
+
+  const cronLabel = (cron: string) => {
+    if (cron === "0 8 * * *") return "Daily";
+    if (cron === "0 8 * * 1") return "Weekly";
+    if (cron === "0 8 1 * *") return "Monthly";
+    return cron;
+  };
+
+  const severityColor = (s: string) => {
+    if (s === "critical") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+    if (s === "warning") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+    return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+  };
+
+  const loadData = useCallback(async () => {
+    if (!clientId) return;
+    try {
+      setLoading(true);
+      const [rules, reps, mets] = await Promise.all([
+        getAlertRules(clientId),
+        getScheduledReports(clientId),
+        getMetrics(),
+      ]);
+      setAlertRules(rules);
+      setReports(reps);
+      setMetricsList(mets);
+    } catch {
+      console.error("Failed to load alerts/reports data");
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!clientId) return;
+    await deleteAlertRule(clientId, ruleId);
+    setAlertRules((prev) => prev.filter((r) => r.id !== ruleId));
+  };
+
+  const handleToggleReport = async (reportId: string, isActive: boolean) => {
+    if (!clientId) return;
+    await toggleScheduledReport(clientId, reportId, !isActive);
+    setReports((prev) => prev.map((r) => r.id === reportId ? { ...r, isActive: !isActive } : r));
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!clientId) return;
+    await deleteScheduledReport(clientId, reportId);
+    setReports((prev) => prev.filter((r) => r.id !== reportId));
+  };
+
+  const handleCreateReport = async () => {
+    if (!clientId || !newTitle.trim() || !newMetric || !newSchedule) return;
+    setCreating(true);
+    try {
+      const recipients = newRecipients
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean);
+      const report = await createScheduledReport(clientId, {
+        title: newTitle.trim(),
+        metricSlug: newMetric,
+        scheduleCron: cronMap[newSchedule],
+        recipients,
+      });
+      setReports((prev) => [report, ...prev]);
+      setNewTitle("");
+      setNewMetric("");
+      setNewSchedule("daily");
+      setNewRecipients("");
+    } catch {
+      console.error("Failed to create report");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-8">
+        <RefreshCw className="w-4 h-4 animate-spin" />
+        Loading alerts & reports...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-brand-deep-purple dark:text-white">
+            <Bell className="w-5 h-5 text-brand-purple" />
+            Alert Rules
+          </CardTitle>
+          <CardDescription>Configured alert rules that trigger on metric thresholds</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {alertRules.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4" data-testid="text-no-alert-rules">No alert rules configured</p>
+          ) : (
+            <div className="space-y-2">
+              {alertRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-surface-purple-light/20 dark:hover:bg-gray-800 transition-colors"
+                  data-testid={`alert-rule-row-${rule.id}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        <span className="font-mono text-brand-purple">{rule.metricSlug}</span>
+                        {" "}
+                        <span className="text-muted-foreground">{rule.condition}</span>
+                        {" "}
+                        <span className="font-mono">{rule.threshold}</span>
+                      </p>
+                    </div>
+                    <Badge className={severityColor(rule.severity)} data-testid={`badge-severity-${rule.id}`}>
+                      {rule.severity}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteRule(rule.id)}
+                    className="text-muted-foreground hover:text-status-alert shrink-0"
+                    data-testid={`btn-delete-alert-rule-${rule.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-brand-deep-purple dark:text-white">
+            <Clock className="w-5 h-5 text-brand-purple" />
+            Scheduled Reports
+          </CardTitle>
+          <CardDescription>Automated metric reports delivered on a schedule</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-surface-purple-light/20 dark:bg-gray-800 rounded-lg space-y-3">
+            <p className="text-sm font-medium text-brand-deep-purple dark:text-white">Create New Report</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="report-title">Title</Label>
+                <Input
+                  id="report-title"
+                  placeholder="Weekly Claims Summary"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  data-testid="input-report-title"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="report-metric">Metric</Label>
+                <Select value={newMetric} onValueChange={setNewMetric}>
+                  <SelectTrigger id="report-metric" data-testid="select-report-metric">
+                    <SelectValue placeholder="Select metric" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {metrics.map((m: any) => (
+                      <SelectItem key={m.slug} value={m.slug}>{m.display_name || m.slug}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="report-schedule">Schedule</Label>
+                <Select value={newSchedule} onValueChange={setNewSchedule}>
+                  <SelectTrigger id="report-schedule" data-testid="select-report-schedule">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily (8:00 AM)</SelectItem>
+                    <SelectItem value="weekly">Weekly (Monday 8:00 AM)</SelectItem>
+                    <SelectItem value="monthly">Monthly (1st at 8:00 AM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="report-recipients">Recipients</Label>
+                <Input
+                  id="report-recipients"
+                  placeholder="email1@co.com, email2@co.com"
+                  value={newRecipients}
+                  onChange={(e) => setNewRecipients(e.target.value)}
+                  data-testid="input-report-recipients"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleCreateReport}
+                disabled={creating || !newTitle.trim() || !newMetric}
+                className="bg-brand-purple hover:bg-brand-purple/90 text-white"
+                data-testid="btn-create-report"
+              >
+                {creating ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-1" />}
+                Create Report
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {reports.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-2" data-testid="text-no-reports">No scheduled reports yet</p>
+          ) : (
+            <div className="space-y-2">
+              {reports.map((report) => (
+                <div
+                  key={report.id}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-surface-purple-light/20 dark:hover:bg-gray-800 transition-colors"
+                  data-testid={`report-row-${report.id}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{report.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-mono text-brand-purple">{report.metricSlug}</span>
+                        <Badge variant="secondary" className="text-xs">{cronLabel(report.scheduleCron)}</Badge>
+                        {report.recipients?.length > 0 && (
+                          <span className="text-xs text-muted-foreground">{report.recipients.length} recipient{report.recipients.length !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Switch
+                      checked={report.isActive}
+                      onCheckedChange={() => handleToggleReport(report.id, report.isActive)}
+                      data-testid={`switch-report-active-${report.id}`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteReport(report.id)}
+                      className="text-muted-foreground hover:text-status-alert"
+                      data-testid={`btn-delete-report-${report.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

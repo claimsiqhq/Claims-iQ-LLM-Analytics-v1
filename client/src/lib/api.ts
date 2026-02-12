@@ -143,6 +143,11 @@ export async function getAlertRules(clientId: string): Promise<any[]> {
   return json.data || [];
 }
 
+export async function deleteAlertRule(clientId: string, ruleId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/alert-rules/${ruleId}?client_id=${clientId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete alert rule");
+}
+
 // Export
 export async function exportCSV(
   metric: string,
@@ -234,6 +239,41 @@ export async function saveDashboard(clientId: string, title: string, layout: any
 export async function deleteDashboard(clientId: string, dashboardId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/dashboards/${dashboardId}?client_id=${clientId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete dashboard");
+}
+
+// Scheduled Reports
+export async function getScheduledReports(clientId: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/scheduled-reports?client_id=${clientId}`);
+  if (!res.ok) throw new Error("Failed to fetch scheduled reports");
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function createScheduledReport(clientId: string, data: { title: string; metricSlug: string; scheduleCron: string; recipients: string[] }): Promise<any> {
+  const res = await fetch(`${API_BASE}/scheduled-reports?client_id=${clientId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create scheduled report");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function toggleScheduledReport(clientId: string, reportId: string, isActive: boolean): Promise<any> {
+  const res = await fetch(`${API_BASE}/scheduled-reports/${reportId}?client_id=${clientId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isActive }),
+  });
+  if (!res.ok) throw new Error("Failed to update scheduled report");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function deleteScheduledReport(clientId: string, reportId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/scheduled-reports/${reportId}?client_id=${clientId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete scheduled report");
 }
 
 // Ingestion

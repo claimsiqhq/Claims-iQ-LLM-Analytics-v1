@@ -162,7 +162,7 @@ anomaliesRouter.get("/api/alert-rules", async (req: Request, res: Response) => {
       success: true,
       data: (rules || []).map((r: any) => ({
         id: r.id,
-        name: r.name ?? `${r.metric_slug} ${mapCondition(r.condition)} ${r.threshold}`,
+        name: `${r.metric_slug} ${mapCondition(r.condition)} ${r.threshold}`,
         metricSlug: r.metric_slug,
         condition: mapCondition(r.condition ?? ""),
         threshold: r.threshold,
@@ -187,7 +187,11 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
     const clientId =
       (req.query.client_id as string) || await getDefaultClientId();
 
-    const { name, metricSlug, condition, threshold, severity } = req.body;
+    const userId = (req.headers["x-user-id"] as string) || (await (async () => {
+      const { getDefaultUserId } = await import("../config/defaults");
+      return getDefaultUserId();
+    })());
+    const { metricSlug, condition, threshold, severity } = req.body;
 
     if (!metricSlug || !condition || threshold === undefined) {
       return res.status(400).json({
@@ -205,14 +209,13 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
 
     const insertPayload: Record<string, unknown> = {
       client_id: clientId,
+      user_id: userId,
       metric_slug: metricSlug,
       condition: mapConditionToSchema(condition),
       threshold,
       severity: severity || "warning",
       is_active: true,
-      created_at: new Date().toISOString(),
     };
-    if (name !== undefined) insertPayload.name = name;
     if (req.body.webhookUrl !== undefined) insertPayload.webhook_url = req.body.webhookUrl;
 
     const { data: rule, error } = await supabase
@@ -225,7 +228,7 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
       throw new Error(`Failed to create alert rule: ${error.message}`);
     }
 
-    const mapCondition = (c: string) => {
+    const mapCond = (c: string) => {
       if (c === "gt") return "exceeds";
       if (c === "lt") return "below";
       if (c === "change_pct") return "anomaly";
@@ -235,9 +238,9 @@ anomaliesRouter.post("/api/alert-rules", async (req: Request, res: Response) => 
       success: true,
       data: {
         id: rule.id,
-        name: rule.name ?? `${rule.metric_slug} ${mapCondition(rule.condition)} ${rule.threshold}`,
+        name: `${rule.metric_slug} ${mapCond(rule.condition)} ${rule.threshold}`,
         metricSlug: rule.metric_slug,
-        condition: mapCondition(rule.condition ?? ""),
+        condition: mapCond(rule.condition ?? ""),
         threshold: rule.threshold,
         severity: rule.severity,
         isActive: rule.is_active,
@@ -261,7 +264,6 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
     const ruleId = req.params.id;
 
     const updates: Record<string, unknown> = {};
-    if (req.body.name !== undefined) updates.name = req.body.name;
     if (req.body.condition !== undefined) {
       updates.condition = mapConditionToSchema(req.body.condition);
     }
@@ -298,7 +300,7 @@ anomaliesRouter.patch("/api/alert-rules/:id", async (req: Request, res: Response
       success: true,
       data: {
         id: rule.id,
-        name: rule.name ?? `${rule.metric_slug} ${mapCondition(rule.condition)} ${rule.threshold}`,
+        name: `${rule.metric_slug} ${mapCondition(rule.condition)} ${rule.threshold}`,
         metricSlug: rule.metric_slug,
         condition: mapCondition(rule.condition ?? ""),
         threshold: rule.threshold,
