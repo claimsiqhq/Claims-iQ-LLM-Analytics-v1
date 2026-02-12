@@ -52,7 +52,7 @@ The frontend has three main layout components:
 ### Settings Page
 
 - **Settings Page** (`client/src/pages/SettingsPage.tsx`): Full settings interface accessible via gear icon in ContextBar
-  - **Data Import**: Upload XLSX spreadsheets as the master record. Every import fully purges and replaces all existing claims, adjusters, policies, estimates, billing, and stage history for the active client.
+  - **Data Import**: Upload XLSX spreadsheets as the master record. Every import fully purges and replaces all existing claims, adjusters, policies, estimates, billing, stage history, LLM usage records, and claim reviews for the active client. Also generates realistic `claim_llm_usage` and `claim_reviews` records from the imported claims, and logs the import to `source_documents` and `ingestion_jobs`.
   - **App Preferences**: Theme selection (light/dark/system), default chart type, time range, notifications, auto-refresh interval
   - **Client & User Management**: View/add/delete client organizations, view adjusters imported from spreadsheet data
   - **AI Model Configuration**: View connected AI providers (Anthropic Claude, OpenAI), feature status, architecture overview
@@ -62,7 +62,8 @@ The frontend has three main layout components:
 
 **Critical design decision:** The LLM is strictly an **intent translator**, not a query generator. It produces structured JSON; the backend validates and compiles queries. This is a hard architectural boundary.
 
-- **LLM Adapter** (`server/llm/adapter.ts`): Abstracted LLM interface using Anthropic Claude (claude-sonnet-4-5). Uses env vars `AI_INTEGRATIONS_ANTHROPIC_API_KEY` and `AI_INTEGRATIONS_ANTHROPIC_BASE_URL`.
+- **LLM Adapter** (`server/llm/adapter.ts`): Abstracted LLM interface using Anthropic Claude (claude-sonnet-4-5). Uses env vars `AI_INTEGRATIONS_ANTHROPIC_API_KEY` and `AI_INTEGRATIONS_ANTHROPIC_BASE_URL`. Optionally logs usage to `claim_llm_usage` when a `claimId` is provided.
+- **Default User** (`server/seedUser.ts`): `ensureDefaultUser()` creates a demo user (admin@claimsiq.com) if none exists, plus `user_client_access` mapping. Called at server startup and during imports.
 - **Intent Parser** (`server/llm/intentParser.ts`): Translates natural language → `ParsedIntent` JSON (metric, dimensions, filters, time range, chart type, assumptions)
 - **Insight Generator** (`server/llm/insightGenerator.ts`): Generates concise analytical summaries from chart data
 - **Batch Processing** (`server/replit_integrations/batch/`): Rate-limited batch processing utilities with retry logic

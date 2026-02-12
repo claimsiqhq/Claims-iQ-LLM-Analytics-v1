@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { createRequire } from "module";
 import { getSupabaseClient, supabase } from "../config/supabase";
-import { getDefaultClientId } from "../config/defaults";
+import { getDefaultClientId, getDefaultUserId } from "../config/defaults";
 import { ensureDefaultUser } from "../seedUser";
 
 const _require = typeof require !== "undefined" ? require : createRequire(import.meta.url);
@@ -48,6 +48,77 @@ const STAGES = [
   "closed_denied",
   "reopened",
 ];
+
+const LLM_MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20250929", "gpt-4o"];
+
+function randomChoice<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateLLMUsageRecords(claimsWithIds: { claimId: string; currentStage: string; fnolDate: string; closedAt: string | null }[]): any[] {
+  const usage: any[] = [];
+  for (const claim of claimsWithIds) {
+    const stageIdx = STAGES.indexOf(claim.currentStage);
+    if (stageIdx < 0) continue;
+    const maxLLMStages = Math.min(stageIdx, 4);
+    for (let s = 0; s <= maxLLMStages; s++) {
+      const callCount = randomInt(1, 3);
+      for (let c = 0; c < callCount; c++) {
+        const model = randomChoice(LLM_MODELS);
+        const inputTokens = randomInt(500, 4000);
+        const outputTokens = randomInt(200, 2000);
+        const costRate = model.includes("haiku") ? 0.00025 : model.includes("sonnet") ? 0.003 : 0.005;
+        const cost = ((inputTokens + outputTokens) / 1000) * costRate;
+        const fnolDate = new Date(claim.fnolDate);
+        if (isNaN(fnolDate.getTime())) continue;
+        const endDate = claim.closedAt ? new Date(claim.closedAt) : new Date();
+        const calledAt = new Date(fnolDate.getTime() + Math.random() * (endDate.getTime() - fnolDate.getTime()));
+        usage.push({
+          claim_id: claim.claimId,
+          model,
+          stage: STAGES[s],
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cost_usd: Math.round(cost * 10000) / 10000,
+          latency_ms: randomInt(200, 5000),
+          called_at: calledAt.toISOString(),
+        });
+      }
+    }
+  }
+  return usage;
+}
+
+function generateReviewRecords(claimsWithIds: { claimId: string; fnolDate: string; closedAt: string | null }[], adjusterDbIds: string[]): any[] {
+  const reviews: any[] = [];
+  const reviewTypes = ["quality_review", "supervisor_review", "re_review"];
+  const outcomes = ["approved", "returned", "escalated"];
+  const llmDecisions = ["approve", "flag_for_review", "escalate", "request_documentation"];
+  for (const claim of claimsWithIds) {
+    const reviewCount = Math.random() < 0.4 ? randomInt(1, 3) : 0;
+    for (let r = 0; r < reviewCount; r++) {
+      const humanOverride = Math.random() < 0.2;
+      const fnolDate = new Date(claim.fnolDate);
+      if (isNaN(fnolDate.getTime())) continue;
+      const endDate = claim.closedAt ? new Date(claim.closedAt) : new Date();
+      const reviewedAt = new Date(fnolDate.getTime() + Math.random() * (endDate.getTime() - fnolDate.getTime()));
+      reviews.push({
+        claim_id: claim.claimId,
+        review_type: randomChoice(reviewTypes),
+        reviewer_id: adjusterDbIds.length > 0 ? randomChoice(adjusterDbIds) : null,
+        outcome: randomChoice(outcomes),
+        llm_decision: randomChoice(llmDecisions),
+        human_override: humanOverride,
+        override_reason: humanOverride ? "Adjuster disagreed with LLM assessment" : null,
+        reviewed_at: reviewedAt.toISOString(),
+      });
+    }
+  }
+  return reviews;
+}
 
 function shiftDatesIntoLastNDays(rows: any[], days: number): void {
   const dateFields = ["date_of_loss", "fnol_date", "assigned_at", "first_touch_at", "closed_at"];
@@ -343,6 +414,72 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
         }
         result.imported.billing = bilInserted;
       }
+
+      const claimsForGen = filteredClaims
+        .map((row: any) => {
+          const claimUuid = claimMap.get(row.claim_number);
+          if (!claimUuid) return null;
+          return {
+            claimId: claimUuid,
+            currentStage: row.current_stage || "fnol_received",
+            fnolDate: row.fnol_date || row.date_of_loss || new Date().toISOString(),
+            closedAt: row.closed_at || null,
+          };
+        })
+        .filter(Boolean) as { claimId: string; currentStage: string; fnolDate: string; closedAt: string | null }[];
+
+      const adjusterDbIds = Object.values(adjusterIdMap).filter((v, i, a) => a.indexOf(v) === i);
+
+      const llmUsage = generateLLMUsageRecords(claimsForGen);
+      let llmInserted = 0;
+      for (let i = 0; i < llmUsage.length; i += 25) {
+        const batch = llmUsage.slice(i, i + 25);
+        const { error } = await sb.from("claim_llm_usage").insert(batch);
+        if (!error) llmInserted += batch.length;
+      }
+      result.imported.llmUsage = llmInserted;
+
+      const reviews = generateReviewRecords(claimsForGen, adjusterDbIds);
+      let reviewsInserted = 0;
+      for (let i = 0; i < reviews.length; i += 25) {
+        const batch = reviews.slice(i, i + 25);
+        const { error } = await sb.from("claim_reviews").insert(batch);
+        if (!error) reviewsInserted += batch.length;
+      }
+      result.imported.reviews = reviewsInserted;
+    }
+
+    const userId = await getDefaultUserId().catch(() => null);
+
+    if (file) {
+      const docRecord = {
+        client_id: clientId,
+        filename: file.originalname,
+        file_path: file.path,
+        document_type: "spreadsheet_import",
+        page_count: Object.keys(wb.Sheets).length,
+        parsed_at: new Date().toISOString(),
+        parse_status: "completed",
+      };
+      try { await sb.from("source_documents").insert(docRecord); } catch {}
+
+      const jobRecord = {
+        client_id: clientId,
+        document_name: file.originalname,
+        document_size: file.size || null,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        extraction_results: {
+          claims: result.imported.claims || 0,
+          adjusters: result.imported.adjusters || 0,
+          policies: result.imported.policies || 0,
+          estimates: result.imported.estimates || 0,
+          billing: result.imported.billing || 0,
+          llmUsage: result.imported.llmUsage || 0,
+          reviews: result.imported.reviews || 0,
+        },
+      };
+      try { await sb.from("ingestion_jobs").insert(jobRecord); } catch {}
     }
 
     res.json({
@@ -399,26 +536,22 @@ settingsRouter.get("/api/settings/data-summary", async (req: Request, res: Respo
     const clientId = (req.query.client_id as string) || await getDefaultClientId();
     const sb = getSupabaseClient();
 
-    const [claims, adjusters, policies, estimates, billing, threads, stages] = await Promise.all([
+    const { data: claimIds } = await sb.from("claims").select("id").eq("client_id", clientId);
+    const ids = claimIds?.map((c: any) => c.id) || [];
+
+    const [claims, adjusters, policies, estimates, billing, threads, stages, llmUsage, reviews, users, ingestionJobs, sourceDocs] = await Promise.all([
       sb.from("claims").select("id", { count: "exact", head: true }).eq("client_id", clientId),
       sb.from("adjusters").select("id", { count: "exact", head: true }).eq("client_id", clientId),
-      sb.from("claim_policies").select("id", { count: "exact", head: true }).in(
-        "claim_id",
-        (await sb.from("claims").select("id").eq("client_id", clientId)).data?.map((c: any) => c.id) || []
-      ),
-      sb.from("claim_estimates").select("id", { count: "exact", head: true }).in(
-        "claim_id",
-        (await sb.from("claims").select("id").eq("client_id", clientId)).data?.map((c: any) => c.id) || []
-      ),
-      sb.from("claim_billing").select("id", { count: "exact", head: true }).in(
-        "claim_id",
-        (await sb.from("claims").select("id").eq("client_id", clientId)).data?.map((c: any) => c.id) || []
-      ),
+      ids.length > 0 ? sb.from("claim_policies").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
+      ids.length > 0 ? sb.from("claim_estimates").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
+      ids.length > 0 ? sb.from("claim_billing").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
       sb.from("threads").select("id", { count: "exact", head: true }).eq("client_id", clientId),
-      sb.from("claim_stage_history").select("id", { count: "exact", head: true }).in(
-        "claim_id",
-        (await sb.from("claims").select("id").eq("client_id", clientId)).data?.map((c: any) => c.id) || []
-      ),
+      ids.length > 0 ? sb.from("claim_stage_history").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
+      ids.length > 0 ? sb.from("claim_llm_usage").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
+      ids.length > 0 ? sb.from("claim_reviews").select("id", { count: "exact", head: true }).in("claim_id", ids) : { count: 0 },
+      sb.from("users").select("id", { count: "exact", head: true }),
+      sb.from("ingestion_jobs").select("id", { count: "exact", head: true }).eq("client_id", clientId),
+      sb.from("source_documents").select("id", { count: "exact", head: true }).eq("client_id", clientId),
     ]);
 
     res.json({
@@ -429,6 +562,11 @@ settingsRouter.get("/api/settings/data-summary", async (req: Request, res: Respo
       billing: billing.count || 0,
       threads: threads.count || 0,
       stageHistory: stages.count || 0,
+      llmUsage: llmUsage.count || 0,
+      reviews: reviews.count || 0,
+      users: users.count || 0,
+      ingestionJobs: ingestionJobs.count || 0,
+      sourceDocuments: sourceDocs.count || 0,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
