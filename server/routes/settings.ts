@@ -121,6 +121,7 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     result.purged.adjusters = true;
 
     const adjusterIdMap: Record<string, string> = {};
+    let adjustersInserted = 0;
     if (adjustersSheet.length > 0) {
       for (let i = 0; i < adjustersSheet.length; i++) {
         const adj = adjustersSheet[i];
@@ -139,24 +140,41 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
           .select("id")
           .single();
         if (!error && inserted) {
+          adjustersInserted++;
           if (adj.adjuster_number) {
             adjusterIdMap[`ADJ-${adj.adjuster_number}`] = inserted.id;
           }
           adjusterIdMap[`ADJ-${String(i + 1).padStart(3, "0")}`] = inserted.id;
         }
       }
-      result.imported.adjusters = Object.keys(adjusterIdMap).length;
+      result.imported.adjusters = adjustersInserted;
     }
 
-    shiftDatesIntoLastNDays(claimsSheet, 90);
+    const EXCLUDED_STATUSES = new Set(["denied", "closed"]);
+    const filteredClaims = claimsSheet.filter((row: any) => {
+      const status = (row.status || "open").toLowerCase();
+      return !EXCLUDED_STATUSES.has(status);
+    });
+    result.skipped = { deniedOrClosed: claimsSheet.length - filteredClaims.length };
 
-    if (claimsSheet.length > 0) {
+    shiftDatesIntoLastNDays(filteredClaims, 90);
+
+    if (filteredClaims.length > 0) {
       const now = new Date();
-      const allNewClaims = claimsSheet.map((row: any) => {
+      const firstNames = ["James","Mary","Robert","Patricia","John","Jennifer","Michael","Linda","David","Elizabeth","William","Barbara","Richard","Susan","Joseph","Jessica","Thomas","Sarah","Christopher","Karen"];
+      const lastNames = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez","Hernandez","Lopez","Wilson","Anderson","Thomas","Taylor","Moore","Jackson","Martin","Lee"];
+      let nameIdx = 0;
+      const generateName = () => {
+        const fn = firstNames[nameIdx % firstNames.length];
+        const ln = lastNames[Math.floor(nameIdx / firstNames.length) % lastNames.length];
+        nameIdx++;
+        return fn + " " + ln;
+      };
+
+      const allNewClaims = filteredClaims.map((row: any) => {
         const adjUuid = adjusterIdMap[row.assigned_adjuster_id] || null;
         let status = row.status || "open";
         if (status === "closed_no_payment") status = "closed";
-        if (status === "denied") status = "closed";
         const rawSeverity = (row.severity || "").toLowerCase();
         const severity = SEVERITY_MAP[rawSeverity] || "medium";
         const peril = row.peril || "Other";
@@ -164,10 +182,12 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
         const assignedAt = row.assigned_at ? new Date(row.assigned_at).toISOString() : fnolDate;
         const firstTouchAt = row.first_touch_at ? new Date(row.first_touch_at).toISOString() : fnolDate;
 
+        const claimantName = (!row.claimant_name || row.claimant_name === "REDACTED" || row.claimant_name.trim() === "") ? generateName() : row.claimant_name;
+
         return {
           client_id: clientId,
           claim_number: row.claim_number,
-          claimant_name: row.claimant_name || "REDACTED",
+          claimant_name: claimantName,
           peril,
           severity,
           region: row.region || "Unknown",
@@ -201,7 +221,7 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       const claimMap = new Map<string, string>((allClaims || []).map((c: any) => [c.claim_number, c.id]));
 
       const stageHistory: any[] = [];
-      for (const row of claimsSheet) {
+      for (const row of filteredClaims) {
         const claimUuid = claimMap.get(row.claim_number);
         if (!claimUuid) continue;
         const stageIdx = STAGES.indexOf(row.current_stage || "fnol");
@@ -210,8 +230,9 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
         const fnolDate = row.fnol_date ? new Date(row.fnol_date) : new Date();
         const closedAt = row.closed_at ? new Date(row.closed_at) : null;
         for (let s = 0; s <= stageIdx; s++) {
-          const normalizedStatus = row.status === "closed_no_payment" || row.status === "denied" ? "closed" : row.status;
-          const isCurrentStage = s === stageIdx && normalizedStatus !== "closed";
+          const normalizedStatus = row.status === "closed_no_payment" ? "closed" : row.status;
+          const isTerminal = normalizedStatus === "closed" || normalizedStatus === "denied";
+          const isCurrentStage = s === stageIdx && !isTerminal;
           const totalSpan = closedAt ? closedAt.getTime() - fnolDate.getTime() : (Date.now() - fnolDate.getTime());
           const stageSpan = Math.max(totalSpan / (stageIdx + 1), 3600000);
           const enteredAt = new Date(fnolDate.getTime() + s * stageSpan);
