@@ -78,7 +78,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
 
   return (
     <Card className="border-l-4 border-brand-gold bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-      <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+      <div className="flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <h3 className="text-lg font-semibold text-gray-900" data-testid="text-morning-brief-title">Morning Brief</h3>
@@ -118,7 +118,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
         </div>
       </div>
 
-      <div className="px-6 py-4">
+      <div className="px-4 md:px-6 py-3 md:py-4">
         <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? "max-h-[2000px]" : "max-h-24"}`}>
           <div className="brief-content prose prose-sm max-w-none text-gray-700">
             <ReactMarkdown
@@ -175,7 +175,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
       </div>
 
       {briefData.metrics.length > 0 && (
-        <div className="px-6 py-4 bg-surface-off-white border-t border-gray-100">
+        <div className="px-4 md:px-6 py-3 md:py-4 bg-surface-off-white border-t border-gray-100">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Key Metrics</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {briefData.metrics.map((metric, idx) => (

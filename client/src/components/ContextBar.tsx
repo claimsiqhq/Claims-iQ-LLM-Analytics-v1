@@ -36,15 +36,15 @@ export const ContextBar = ({ clientId, onClientChange }: ContextBarProps) => {
   const selectedClient = clients.find((c) => c.id === clientId);
 
   return (
-    <div className="h-14 w-full bg-brand-deep-purple flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50 shadow-md">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden">
+    <div className="h-14 w-full bg-brand-deep-purple flex items-center justify-between px-3 md:px-6 fixed top-0 left-0 right-0 z-50 shadow-md">
+      <div className="flex items-center gap-3 md:gap-6 min-w-0">
+        <div className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden shrink-0">
           <img src={logo} alt="Claims IQ Logo" className="w-full h-full object-contain" />
         </div>
-        <div className="h-4 w-[1px] bg-white/20"></div>
+        <div className="h-4 w-[1px] bg-white/20 hidden md:block"></div>
 
         <Select value={clientId} onValueChange={onClientChange}>
-          <SelectTrigger className="w-48 bg-white/10 border-white/20 text-white hover:bg-white/20" data-testid="select-client-trigger">
+          <SelectTrigger className="w-36 md:w-48 bg-white/10 border-white/20 text-white hover:bg-white/20 text-sm" data-testid="select-client-trigger">
             <SelectValue placeholder="Select client">
               {selectedClient ? selectedClient.name : "Select client"}
             </SelectValue>
@@ -63,10 +63,10 @@ export const ContextBar = ({ clientId, onClientChange }: ContextBarProps) => {
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3 shrink-0">
         <button
           onClick={() => setTheme((resolvedTheme ?? theme) === "dark" ? "light" : "dark")}
-          className="p-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          className="p-1.5 md:p-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors hidden md:flex"
           title={(resolvedTheme ?? theme) === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
           {(resolvedTheme ?? theme) === "dark" ? (

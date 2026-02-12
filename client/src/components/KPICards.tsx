@@ -37,11 +37,11 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
   if (loading || kpis.length === 0) return null;
 
   return (
-    <div className="flex gap-3 mb-6 flex-wrap justify-center">
+    <div className="flex gap-3 mb-4 md:mb-6 overflow-x-auto pb-1 md:pb-0 md:flex-wrap md:justify-center scrollbar-thin">
       {kpis.map((kpi, idx) => (
         <Card
           key={idx}
-          className="px-4 py-3 min-w-[140px] border border-surface-grey-lavender bg-white shadow-sm"
+          className="px-3 md:px-4 py-2.5 md:py-3 min-w-[120px] md:min-w-[140px] border border-surface-grey-lavender bg-white shadow-sm shrink-0"
           data-testid={`kpi-card-${kpi.label.toLowerCase().replace(/\s+/g, "-")}`}
         >
           <p className="text-xs text-text-secondary font-medium">{kpi.label}</p>

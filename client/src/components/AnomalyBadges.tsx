@@ -101,7 +101,7 @@ export const AnomalyBadges: React.FC<AnomalyBadgesProps> = ({ clientId }) => {
   );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="hidden md:flex items-center gap-2">
       {criticalCount > 0 && (
         <Popover>
           <PopoverTrigger asChild>

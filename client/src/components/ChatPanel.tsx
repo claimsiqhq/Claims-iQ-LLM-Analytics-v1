@@ -298,9 +298,10 @@ interface ChatPanelProps {
   questionToSubmit?: string | null;
   onQuestionSubmitted?: () => void;
   width?: number;
+  onClose?: () => void;
 }
 
-export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId, questionToSubmit, onQuestionSubmitted, width = 360 }: ChatPanelProps) => {
+export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoading, setIsLoading, clientId, questionToSubmit, onQuestionSubmitted, width = 360, onClose }: ChatPanelProps) => {
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages] = useState<MessageData[]>([]);
@@ -512,17 +513,28 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   ];
 
   return (
-    <div className="fixed top-14 bottom-0 left-0 bg-surface-purple-light border-r border-surface-grey-lavender flex flex-col z-40" style={{ width: `${width}px` }}>
+    <div className="fixed top-0 md:top-14 bottom-0 left-0 bg-surface-purple-light border-r border-surface-grey-lavender flex flex-col z-40" style={{ width: onClose ? '100%' : `${width}px` }}>
       <div className="p-4 bg-surface-purple-light shrink-0 border-b border-surface-grey-lavender/50 flex items-center h-[72px]">
         {view === 'list' ? (
-          <button
-            data-testid="button-new-conversation"
-            onClick={() => { onThreadSelect('new'); setView('chat'); setChatMessages([]); setCurrentThreadId(null); }}
-            className="w-full h-10 bg-brand-purple hover:bg-brand-purple/90 text-white rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm active:transform active:scale-[0.98]"
-          >
-            <Plus className="w-5 h-5" strokeWidth={2} />
-            <span className="font-body font-semibold text-sm">New Conversation</span>
-          </button>
+          <div className="flex items-center gap-2 w-full">
+            <button
+              data-testid="button-new-conversation"
+              onClick={() => { onThreadSelect('new'); setView('chat'); setChatMessages([]); setCurrentThreadId(null); }}
+              className="flex-1 h-10 bg-brand-purple hover:bg-brand-purple/90 text-white rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm active:transform active:scale-[0.98]"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2} />
+              <span className="font-body font-semibold text-sm">New Conversation</span>
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/50 rounded-lg text-text-secondary hover:text-brand-deep-purple transition-colors shrink-0"
+                data-testid="btn-close-chat-mobile"
+              >
+                <NavArrowLeft className="w-5 h-5" strokeWidth={2} />
+              </button>
+            )}
+          </div>
         ) : (
           <div className="flex items-center gap-2 w-full">
             <button

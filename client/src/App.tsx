@@ -6,6 +6,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MorningBrief } from "@/components/MorningBrief";
 import { KPICards } from "@/components/KPICards";
 import { Toaster } from "@/components/ui/toaster";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MessageCircle } from 'lucide-react';
 
 export interface ChartResponse {
   thread_id: string;
@@ -51,6 +53,9 @@ function App() {
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [questionToSubmit, setQuestionToSubmit] = useState<string | null>(null);
+
+  const isMobile = useIsMobile();
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
 
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const isDragging = useRef(false);
@@ -99,7 +104,10 @@ function App() {
         return [response, ...prev];
       });
     }
-  }, []);
+    if (isMobile) {
+      setMobileChatOpen(false);
+    }
+  }, [isMobile]);
 
   const handleRemovePanel = useCallback((turnId: string) => {
     setChartPanels(prev => prev.filter(p => p.turn_id !== turnId));
@@ -130,27 +138,62 @@ function App() {
           onClientChange={setSelectedClientId}
         />
         <div className="flex h-screen overflow-hidden">
-          <ChatPanel
-            activeThreadId={activeThreadId}
-            onThreadSelect={setActiveThreadId}
-            onNewResponse={handleNewResponse}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-            clientId={selectedClientId}
-            questionToSubmit={questionToSubmit}
-            onQuestionSubmitted={() => setQuestionToSubmit(null)}
-            width={chatWidth}
-          />
-          <div
-            data-testid="chat-resize-handle"
-            onMouseDown={handleResizeStart}
-            className="fixed top-14 bottom-0 z-50 w-1.5 cursor-col-resize group hover:bg-brand-purple/20 active:bg-brand-purple/30 transition-colors"
-            style={{ left: `${chatWidth - 3}px` }}
-          >
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-transparent group-hover:bg-brand-purple/40 transition-colors" />
-          </div>
+          {isMobile ? (
+            <>
+              {mobileChatOpen && (
+                <div
+                  className="fixed inset-0 bg-black/40 z-40 animate-in fade-in duration-200"
+                  onClick={() => setMobileChatOpen(false)}
+                />
+              )}
+              <div
+                className={`fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[400px] transform transition-transform duration-300 ease-in-out ${
+                  mobileChatOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+              >
+                <ChatPanel
+                  activeThreadId={activeThreadId}
+                  onThreadSelect={setActiveThreadId}
+                  onNewResponse={handleNewResponse}
+                  isLoading={isLoading}
+                  setIsLoading={setIsLoading}
+                  clientId={selectedClientId}
+                  questionToSubmit={questionToSubmit}
+                  onQuestionSubmitted={() => setQuestionToSubmit(null)}
+                  width={window.innerWidth * 0.85}
+                  onClose={() => setMobileChatOpen(false)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <ChatPanel
+                activeThreadId={activeThreadId}
+                onThreadSelect={setActiveThreadId}
+                onNewResponse={handleNewResponse}
+                isLoading={isLoading}
+                setIsLoading={setIsLoading}
+                clientId={selectedClientId}
+                questionToSubmit={questionToSubmit}
+                onQuestionSubmitted={() => setQuestionToSubmit(null)}
+                width={chatWidth}
+              />
+              <div
+                data-testid="chat-resize-handle"
+                onMouseDown={handleResizeStart}
+                className="fixed top-14 bottom-0 z-50 w-1.5 cursor-col-resize group hover:bg-brand-purple/20 active:bg-brand-purple/30 transition-colors"
+                style={{ left: `${chatWidth - 3}px` }}
+              >
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-transparent group-hover:bg-brand-purple/40 transition-colors" />
+              </div>
+            </>
+          )}
+
           <main className="flex-1 h-full overflow-y-auto w-full relative">
-            <div className="pt-14 p-6 space-y-6 max-w-[1400px] mx-auto" style={{ marginLeft: `${chatWidth}px` }}>
+            <div
+              className="pt-14 p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
+              style={!isMobile ? { marginLeft: `${chatWidth}px` } : undefined}
+            >
               <KPICards clientId={selectedClientId} />
               <div ref={chartContainerRef}>
                 <Canvas
@@ -163,12 +206,24 @@ function App() {
                   onRemovePanel={handleRemovePanel}
                   onClearPanels={handleClearPanels}
                   onLoadDashboard={handleLoadDashboard}
+                  isMobile={isMobile}
                 />
               </div>
               <MorningBrief clientId={selectedClientId} />
             </div>
           </main>
         </div>
+
+        {isMobile && !mobileChatOpen && (
+          <button
+            onClick={() => setMobileChatOpen(true)}
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-purple text-white rounded-full shadow-lg flex items-center justify-center hover:bg-brand-purple/90 active:scale-95 transition-all"
+            data-testid="btn-mobile-chat-toggle"
+          >
+            <MessageCircle className="w-6 h-6" />
+          </button>
+        )}
+
         <Toaster />
       </div>
     </ErrorBoundary>

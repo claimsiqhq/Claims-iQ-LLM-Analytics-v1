@@ -391,8 +391,8 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
         </button>
       )}
 
-      <div className={`${compact ? 'p-4' : 'p-6'}`} ref={chartAreaRef}>
-        <div className="flex justify-between items-start mb-4 pr-6">
+      <div className={`${compact ? 'p-3 md:p-4' : 'p-4 md:p-6'}`} ref={chartAreaRef}>
+        <div className="flex justify-between items-start mb-3 md:mb-4 pr-6">
           <div className="min-w-0 flex-1">
             <h2 className={`font-display font-semibold text-brand-deep-purple mb-1 truncate ${compact ? 'text-base' : 'text-xl'}`} data-testid="text-chart-title">
               {response.chart.title}
@@ -458,7 +458,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
       </div>
 
       {!compact && response.insight && (
-        <div className="px-6 pb-4">
+        <div className="px-4 md:px-6 pb-3 md:pb-4">
           <div className="bg-surface-purple-light/50 border-l-3 border-brand-purple p-4 rounded-r-lg">
             <div className="prose prose-sm max-w-none">
               <ReactMarkdown
@@ -491,7 +491,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
       )}
 
       {!compact && response.followUpSuggestions && response.followUpSuggestions.length > 0 && (
-        <div className="px-6 pb-4">
+        <div className="px-4 md:px-6 pb-3 md:pb-4">
           <div className="flex flex-wrap gap-1.5" data-testid="follow-up-suggestions">
             <span className="text-xs text-text-secondary font-medium self-center mr-1">Ask next:</span>
             {response.followUpSuggestions.map((q, i) => (
@@ -509,7 +509,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
       )}
 
       {!compact && response.assumptions && response.assumptions.length > 0 && (
-        <div className="px-6 pb-4">
+        <div className="px-4 md:px-6 pb-3 md:pb-4">
           <div className="flex flex-wrap gap-1.5" data-testid="assumptions-bar">
             <span className="text-xs text-text-secondary font-medium self-center mr-1">Assumptions:</span>
             {response.assumptions.map((a, i) => {
@@ -566,11 +566,12 @@ interface CanvasProps {
   onRemovePanel?: (turnId: string) => void;
   onClearPanels?: () => void;
   onLoadDashboard?: (panels: ChartResponse[]) => void;
+  isMobile?: boolean;
 }
 
 type LayoutMode = 'single' | 'grid';
 
-export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading, clientId = "", onFollowUpClick, onRemovePanel, onClearPanels, onLoadDashboard }: CanvasProps) => {
+export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading, clientId = "", onFollowUpClick, onRemovePanel, onClearPanels, onLoadDashboard, isMobile = false }: CanvasProps) => {
   const [drillDownOpen, setDrillDownOpen] = useState(false);
   const [drillDownMetric, setDrillDownMetric] = useState("");
   const [drillDownFilters, setDrillDownFilters] = useState<Record<string, any>>({});
@@ -702,12 +703,12 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
     );
   }
 
-  const isCompact = layoutMode === 'grid' && chartPanels.length > 1;
+  const isCompact = !isMobile && layoutMode === 'grid' && chartPanels.length > 1;
 
   return (
     <div className="space-y-4">
       {chartPanels.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-display font-semibold text-brand-deep-purple">
               Dashboard
@@ -716,25 +717,27 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
               {chartPanels.length} {chartPanels.length === 1 ? 'chart' : 'charts'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex bg-white border border-surface-grey-lavender rounded-lg overflow-hidden">
-              <button
-                onClick={() => setLayoutMode('single')}
-                className={`p-1.5 transition-colors ${layoutMode === 'single' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
-                title="Single column"
-                data-testid="btn-layout-single"
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setLayoutMode('grid')}
-                className={`p-1.5 transition-colors ${layoutMode === 'grid' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
-                title="Grid layout"
-                data-testid="btn-layout-grid"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isMobile && (
+              <div className="flex bg-white border border-surface-grey-lavender rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setLayoutMode('single')}
+                  className={`p-1.5 transition-colors ${layoutMode === 'single' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
+                  title="Single column"
+                  data-testid="btn-layout-single"
+                >
+                  <LayoutList className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setLayoutMode('grid')}
+                  className={`p-1.5 transition-colors ${layoutMode === 'grid' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
+                  title="Grid layout"
+                  data-testid="btn-layout-grid"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             <div className="relative">
               <button
                 onClick={handleLoadDashboards}
@@ -815,7 +818,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
         </div>
       )}
 
-      <div className={`${isCompact ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-4'}`}>
+      <div className={`${isCompact ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3 md:space-y-4'}`}>
         {chartPanels.map((panel, idx) => (
           <ChartPanel
             key={panel.turn_id}
