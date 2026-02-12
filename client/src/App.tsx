@@ -206,7 +206,7 @@ function App() {
 
           <main className="flex-1 h-full overflow-y-auto w-full relative">
             <div
-              className="pt-20 p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
+              className="pt-24 p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
               style={!isMobile ? { marginLeft: `${chatWidth}px` } : undefined}
             >
               <KPICards clientId={selectedClientId} />
