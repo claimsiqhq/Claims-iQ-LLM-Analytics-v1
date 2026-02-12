@@ -24,6 +24,7 @@ import {
 import {
   getComparisonDateRange,
   createComparisonIntent,
+  getComparisonLabel,
 } from "./engine/comparisonHelper";
 import {
   generateInsight,
@@ -264,12 +265,13 @@ export async function registerRoutes(
           validation.metric!,
           resolvedClientId
         );
+        const compLabel = getComparisonLabel(intent.comparison.offset, currStart, currEnd);
         chartData = formatChartDataForComparison(
           rawData,
           compResult.data as any[],
           intent,
           validation.metric!,
-          "Previous Period"
+          compLabel
         );
       } else {
         chartData = formatChartData(rawData, intent, validation.metric!);

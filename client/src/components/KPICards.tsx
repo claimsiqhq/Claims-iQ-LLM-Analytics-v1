@@ -54,11 +54,11 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
       {kpis.map((kpi, idx) => (
         <Card
           key={idx}
-          className="px-2.5 md:px-3 py-2 md:py-2.5 min-w-[100px] md:min-w-[120px] border border-surface-grey-lavender bg-white shadow-sm shrink-0"
+          className="px-2.5 md:px-3 py-2 md:py-2.5 min-w-[100px] md:min-w-[120px] border border-surface-grey-lavender dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm dark:shadow-gray-900/30 shrink-0"
           data-testid={`kpi-card-${kpi.label.toLowerCase().replace(/\s+/g, "-")}`}
         >
-          <p className="text-[10px] md:text-xs text-text-secondary font-medium leading-tight truncate">{kpi.label}</p>
-          <p className="text-base md:text-lg font-bold text-brand-deep-purple font-mono mt-0.5">
+          <p className="text-[10px] md:text-xs text-text-secondary dark:text-gray-400 font-medium leading-tight truncate">{kpi.label}</p>
+          <p className="text-base md:text-lg font-bold text-brand-deep-purple dark:text-gray-100 font-mono mt-0.5">
             {kpi.value}
             {kpi.unit && kpi.unit !== "%" && (
               <span className="text-xs font-normal text-text-secondary ml-0.5">{kpi.unit}</span>

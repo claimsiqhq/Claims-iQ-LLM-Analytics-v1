@@ -133,7 +133,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-surface-off-white font-body text-brand-deep-purple selection:bg-brand-purple-light overflow-hidden">
+      <div className="min-h-screen bg-surface-off-white dark:bg-gray-900 font-body text-brand-deep-purple dark:text-gray-100 selection:bg-brand-purple-light overflow-hidden">
         <ContextBar
           clientId={selectedClientId}
           onClientChange={setSelectedClientId}
@@ -182,7 +182,7 @@ function App() {
               <div
                 data-testid="chat-resize-handle"
                 onMouseDown={handleResizeStart}
-                className="fixed top-14 bottom-0 z-50 w-1.5 cursor-col-resize group hover:bg-brand-purple/20 active:bg-brand-purple/30 transition-colors"
+                className="fixed top-14 bottom-0 z-50 w-1.5 cursor-col-resize group hover:bg-brand-purple/20 active:bg-brand-purple/30 dark:hover:bg-brand-purple/30 dark:active:bg-brand-purple/40 transition-colors"
                 style={{ left: `${chatWidth - 3}px` }}
               >
                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-transparent group-hover:bg-brand-purple/40 transition-colors" />

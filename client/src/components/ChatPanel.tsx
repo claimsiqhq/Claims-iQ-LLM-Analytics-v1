@@ -74,8 +74,8 @@ const ThreadItem = ({ thread, isActive, onClick }: { thread: ThreadData, isActiv
       data-testid={`thread-item-${thread.id}`}
       onClick={onClick}
       className={cn(
-        "group relative h-16 w-full flex items-center px-4 cursor-pointer transition-all duration-200 border-b border-surface-grey-lavender/40 hover:bg-surface-purple-light/50",
-        isActive ? "bg-brand-purple-light/20" : "bg-white"
+        "group relative h-16 w-full flex items-center px-4 cursor-pointer transition-all duration-200 border-b border-surface-grey-lavender/40 dark:border-gray-700/40 hover:bg-surface-purple-light/50 dark:hover:bg-gray-700/50",
+        isActive ? "bg-brand-purple-light/20 dark:bg-gray-700/40" : "bg-white dark:bg-gray-800"
       )}
     >
       <div className={cn(
@@ -234,9 +234,9 @@ const ChatMessage = ({
 
   return (
     <div className="flex justify-start mb-6 animate-in slide-in-from-left-4 duration-500">
-      <div className="max-w-[90%] bg-white border border-surface-grey-lavender rounded-xl p-3 shadow-sm hover:shadow-md hover:border-brand-purple-light transition-all cursor-pointer group">
+      <div className="max-w-[90%] bg-white dark:bg-gray-800 border border-surface-grey-lavender dark:border-gray-700 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-brand-purple-light transition-all cursor-pointer group">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-lg bg-surface-purple-light flex items-center justify-center shrink-0 group-hover:bg-brand-purple-light transition-colors">
+          <div className="w-12 h-12 rounded-lg bg-surface-purple-light dark:bg-gray-700 flex items-center justify-center shrink-0 group-hover:bg-brand-purple-light transition-colors">
             <BarChartIcon className="w-6 h-6 text-brand-purple" />
           </div>
           <div className="flex-1 min-w-0">
@@ -513,8 +513,8 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   ];
 
   return (
-    <div className="fixed top-0 md:top-14 bottom-0 left-0 bg-surface-purple-light border-r border-surface-grey-lavender flex flex-col z-40" style={{ width: onClose ? '100%' : `${width}px` }}>
-      <div className="p-4 bg-surface-purple-light shrink-0 border-b border-surface-grey-lavender/50 flex items-center h-[72px]">
+    <div className="fixed top-0 md:top-14 bottom-0 left-0 bg-surface-purple-light dark:bg-gray-900 border-r border-surface-grey-lavender dark:border-gray-700 flex flex-col z-40" style={{ width: onClose ? '100%' : `${width}px` }}>
+      <div className="p-4 bg-surface-purple-light dark:bg-gray-900 shrink-0 border-b border-surface-grey-lavender/50 dark:border-gray-700/50 flex items-center h-[72px]">
         {view === 'list' ? (
           <div className="flex items-center gap-2 w-full">
             <button
@@ -645,7 +645,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
           <div className="p-4 animate-in slide-in-from-right-8 duration-300">
             {chatMessages.length === 0 && !isLoading ? (
               <div className="text-center mt-10 opacity-60">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
                   <Plus className="w-6 h-6 text-brand-purple" />
                 </div>
                 <p className="text-sm text-text-secondary">Ask a question about your claims data</p>
@@ -663,7 +663,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
             )}
             {isLoading && (
               <div className="flex justify-start mb-6">
-                <div className="bg-white border border-surface-grey-lavender rounded-xl p-4 shadow-sm flex items-center gap-3">
+                <div className="bg-white dark:bg-gray-800 border border-surface-grey-lavender dark:border-gray-700 rounded-xl p-4 shadow-sm flex items-center gap-3">
                   <Loader2 className="w-5 h-5 text-brand-purple animate-spin" />
                   <span className="text-sm text-text-secondary">Analyzing your question...</span>
                 </div>
@@ -674,18 +674,18 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
         )}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-surface-purple-light/95 backdrop-blur-sm p-4 border-t border-surface-grey-lavender z-50">
+      <div className="absolute bottom-0 left-0 right-0 bg-surface-purple-light/95 dark:bg-gray-900/95 backdrop-blur-sm p-4 border-t border-surface-grey-lavender dark:border-gray-700 z-50">
         <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mask-gradient-right">
           {promptChips.map((chip, idx) => (
             <button
               key={idx}
               data-testid={`chip-${idx}`}
               onClick={() => {
-                setInputValue(chip.label);
                 setView('chat');
                 if (!activeThreadId || activeThreadId === 'new') onThreadSelect('new');
+                handleSend(chip.label);
               }}
-              className="whitespace-nowrap px-3 py-1.5 bg-white border border-surface-grey-lavender rounded-full text-xs text-brand-deep-purple hover:bg-surface-purple-light hover:border-brand-purple-light transition-colors shadow-sm"
+              className="whitespace-nowrap px-3 py-1.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple-light transition-colors shadow-sm"
             >
               {chip.label}
             </button>
@@ -705,7 +705,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
             }}
             placeholder="Ask about claims data..."
             disabled={isLoading}
-            className="w-full min-h-[50px] max-h-[120px] bg-white border border-surface-grey-lavender rounded-xl p-3 pr-12 text-sm font-body text-brand-deep-purple placeholder:text-brand-purple-secondary/70 focus:outline-none focus:ring-2 focus:ring-brand-purple-light focus:border-transparent resize-none shadow-sm disabled:opacity-50"
+            className="w-full min-h-[50px] max-h-[120px] bg-white dark:bg-gray-800 border border-surface-grey-lavender dark:border-gray-700 rounded-xl p-3 pr-12 text-sm font-body text-brand-deep-purple dark:text-gray-100 placeholder:text-brand-purple-secondary/70 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-purple-light focus:border-transparent resize-none shadow-sm disabled:opacity-50"
           />
           <button
             data-testid="button-send"

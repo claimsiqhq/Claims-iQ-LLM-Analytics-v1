@@ -77,11 +77,11 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
   };
 
   return (
-    <Card className="border-l-4 border-brand-gold bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-      <div className="flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100">
+    <Card className="border-l-4 border-brand-gold bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/30 mb-6 overflow-hidden">
+      <div className="flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-lg font-semibold text-gray-900" data-testid="text-morning-brief-title">Morning Brief</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100" data-testid="text-morning-brief-title">Morning Brief</h3>
             {briefData.anomalies > 0 && (
               <Badge className="bg-brand-gold text-brand-deep-purple">
                 {briefData.anomalies} anomalies
@@ -101,26 +101,26 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
           <button
             onClick={fetchMorningBrief}
             disabled={loading}
-            className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label="Refresh brief"
             data-testid="button-refresh-brief"
           >
-            <Refresh width={18} height={18} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
+            <Refresh width={18} height={18} className={`text-gray-600 dark:text-gray-400 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={() => setIsDismissed(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             aria-label="Dismiss brief"
             data-testid="button-dismiss-brief"
           >
-            <X width={18} height={18} className="text-gray-600" />
+            <X width={18} height={18} className="text-gray-600 dark:text-gray-400" />
           </button>
         </div>
       </div>
 
       <div className="px-4 md:px-6 py-3 md:py-4">
         <div className={`transition-all duration-300 overflow-hidden ${isExpanded ? "max-h-[2000px]" : "max-h-24"}`}>
-          <div className="brief-content prose prose-sm max-w-none text-gray-700">
+          <div className="brief-content prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
             <ReactMarkdown
               components={{
                 h1: ({ children }) => (
@@ -130,19 +130,19 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
                   <h4 className="text-sm font-bold text-brand-deep-purple mt-4 mb-1.5 first:mt-0 font-display">{children}</h4>
                 ),
                 h3: ({ children }) => (
-                  <h5 className="text-sm font-semibold text-gray-800 mt-3 mb-1 first:mt-0 font-display">{children}</h5>
+                  <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-3 mb-1 first:mt-0 font-display">{children}</h5>
                 ),
                 p: ({ children }) => (
-                  <p className="text-sm text-gray-700 leading-relaxed mb-3 last:mb-0">{children}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-3 last:mb-0">{children}</p>
                 ),
                 strong: ({ children }) => (
                   <strong className="font-semibold text-brand-deep-purple">{children}</strong>
                 ),
                 ul: ({ children }) => (
-                  <ul className="text-sm text-gray-700 space-y-1.5 mb-3 ml-1">{children}</ul>
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1.5 mb-3 ml-1">{children}</ul>
                 ),
                 ol: ({ children }) => (
-                  <ol className="text-sm text-gray-700 space-y-1.5 mb-3 ml-1 list-decimal list-inside">{children}</ol>
+                  <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-1.5 mb-3 ml-1 list-decimal list-inside">{children}</ol>
                 ),
                 li: ({ children }) => (
                   <li className="flex items-start gap-2 text-sm leading-relaxed">
@@ -151,10 +151,10 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
                   </li>
                 ),
                 em: ({ children }) => (
-                  <em className="text-gray-500 not-italic text-xs">{children}</em>
+                  <em className="text-gray-500 dark:text-gray-400 not-italic text-xs">{children}</em>
                 ),
                 hr: () => (
-                  <hr className="my-3 border-gray-200" />
+                  <hr className="my-3 border-gray-200 dark:border-gray-700" />
                 ),
               }}
             >
@@ -175,15 +175,15 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
       </div>
 
       {briefData.metrics.length > 0 && (
-        <div className="px-4 md:px-6 py-3 md:py-4 bg-surface-off-white border-t border-gray-100">
+        <div className="px-4 md:px-6 py-3 md:py-4 bg-surface-off-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Key Metrics</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {briefData.metrics.map((metric, idx) => (
-              <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200" data-testid={`card-metric-${idx}`}>
+              <div key={idx} className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600" data-testid={`card-metric-${idx}`}>
                 <p className="text-xs text-text-secondary font-medium">{metric.label}</p>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <p className="text-lg font-bold text-gray-900 font-mono">{metric.value}</p>
-                  {metric.unit && <p className="text-xs text-gray-500">{metric.unit}</p>}
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono">{metric.value}</p>
+                  {metric.unit && <p className="text-xs text-gray-500 dark:text-gray-400">{metric.unit}</p>}
                 </div>
                 {metric.trend && (
                   <p className={`text-xs mt-1 ${getTrendColor(metric.trend)}`}>

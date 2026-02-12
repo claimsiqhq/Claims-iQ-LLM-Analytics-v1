@@ -379,7 +379,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
   if (!response.chart) return null;
 
   return (
-    <div className={`bg-white rounded-xl border shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500 ${isLatest ? 'border-brand-purple/40 ring-1 ring-brand-purple/20' : 'border-surface-grey-lavender'}`} data-testid={`chart-panel-${response.turn_id}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-xl border shadow-sm dark:shadow-gray-900/30 relative overflow-hidden animate-in zoom-in-95 duration-500 ${isLatest ? 'border-brand-purple/40 ring-1 ring-brand-purple/20' : 'border-surface-grey-lavender dark:border-gray-700'}`} data-testid={`chart-panel-${response.turn_id}`}>
       {onRemove && (
         <button
           onClick={onRemove}
@@ -407,7 +407,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
             <select
               value={chartTypeOverride ?? response.chart.type}
               onChange={(e) => setChartTypeOverride(e.target.value)}
-              className={`border border-surface-grey-lavender rounded-lg bg-white text-brand-deep-purple hover:border-brand-purple-light focus:outline-none focus:ring-2 focus:ring-brand-purple-light ${compact ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1.5'}`}
+              className={`border border-surface-grey-lavender dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 text-brand-deep-purple dark:text-gray-200 hover:border-brand-purple-light focus:outline-none focus:ring-2 focus:ring-brand-purple-light ${compact ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1.5'}`}
               data-testid="chart-type-select"
             >
               {CHART_TYPES.map((t) => (
@@ -441,7 +441,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
           />
         </div>
 
-        <div className={`mt-4 pt-3 border-t border-surface-grey-lavender flex items-center justify-between text-xs text-text-secondary ${compact ? 'gap-2' : ''}`}>
+        <div className={`mt-4 pt-3 border-t border-surface-grey-lavender dark:border-gray-700 flex items-center justify-between text-xs text-text-secondary ${compact ? 'gap-2' : ''}`}>
           <div className="flex gap-3 truncate">
             <span className="flex items-center gap-1">
               <Refresh className="w-3.5 h-3.5 text-brand-gold" />
@@ -451,7 +451,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
               <span className="text-green-600 font-medium">cached</span>
             )}
           </div>
-          <div className="font-mono bg-surface-purple-light px-2 py-0.5 rounded text-brand-deep-purple text-xs" data-testid="text-record-count">
+          <div className="font-mono bg-surface-purple-light dark:bg-gray-700 px-2 py-0.5 rounded text-brand-deep-purple dark:text-gray-200 text-xs" data-testid="text-record-count">
             n={response.metadata?.record_count?.toLocaleString() || 0}
           </div>
         </div>
@@ -459,7 +459,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
 
       {!compact && response.insight && (
         <div className="px-4 md:px-6 pb-3 md:pb-4">
-          <div className="bg-surface-purple-light/50 border-l-3 border-brand-purple p-4 rounded-r-lg">
+          <div className="bg-surface-purple-light/50 dark:bg-gray-700/50 border-l-3 border-brand-purple p-4 rounded-r-lg">
             <div className="prose prose-sm max-w-none">
               <ReactMarkdown
                 components={{
@@ -498,7 +498,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
               <button
                 key={i}
                 onClick={() => onFollowUpClick?.(q)}
-                className="px-2.5 py-1 bg-white border border-brand-purple-light rounded-full text-xs text-brand-deep-purple hover:bg-surface-purple-light hover:border-brand-purple transition-colors cursor-pointer"
+                className="px-2.5 py-1 bg-white dark:bg-gray-700 border border-brand-purple-light dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple transition-colors cursor-pointer"
                 data-testid={`btn-followup-${i}`}
               >
                 {q}
@@ -526,7 +526,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
                         e.target.value = "";
                       }
                     }}
-                    className="px-2.5 py-1 bg-white border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple hover:border-brand-gold transition-colors cursor-pointer appearance-none pr-5"
+                    className="px-2.5 py-1 bg-white dark:bg-gray-700 border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:border-brand-gold transition-colors cursor-pointer appearance-none pr-5"
                     style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23C6A54E'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
                     data-testid={`assumption-select-${i}`}
                   >
@@ -543,7 +543,7 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
               return (
                 <span
                   key={i}
-                  className="px-2.5 py-1 bg-white border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple hover:border-brand-gold transition-colors"
+                  className="px-2.5 py-1 bg-white dark:bg-gray-700 border border-brand-gold/30 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:border-brand-gold transition-colors"
                 >
                   {a.label}: {a.assumed_value || a.value}
                 </span>
@@ -652,7 +652,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
 
   if (isLoading && chartPanels.length === 0) {
     return (
-      <div className="bg-surface-off-white flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+      <div className="bg-surface-off-white dark:bg-gray-900 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
         <Loader2 className="w-12 h-12 text-brand-purple animate-spin mb-4" />
         <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
       </div>
@@ -661,7 +661,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
 
   if (chartPanels.length === 0 && (!activeThreadId || activeThreadId === 'new' || !currentResponse)) {
     return (
-      <div className="bg-surface-off-white flex flex-col items-center justify-center p-6 md:p-8 text-center animate-in fade-in duration-500">
+      <div className="bg-surface-off-white dark:bg-gray-900 flex flex-col items-center justify-center p-6 md:p-8 text-center animate-in fade-in duration-500">
         <div className="max-w-md">
           <img src={emptyStateImg} alt="No Data" className="w-32 md:w-40 h-32 md:h-40 object-contain mx-auto opacity-90 mix-blend-multiply mb-4" />
           <h1 className="type-h1 text-brand-deep-purple mb-2" data-testid="text-hero-title">
@@ -671,9 +671,9 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
             Ask questions to build your analytics dashboard. Each chart stays on the canvas so you can compare multiple metrics side by side.
           </p>
           <div className="flex flex-wrap gap-2 justify-center opacity-60">
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">SLA Breach Rate?</span>
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Queue Depth by Region</span>
-            <span className="px-3 py-1 bg-white rounded-full text-xs text-text-secondary border border-surface-grey-lavender">Cost per Claim</span>
+            <span className="px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs text-text-secondary border border-surface-grey-lavender dark:border-gray-600">SLA Breach Rate?</span>
+            <span className="px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs text-text-secondary border border-surface-grey-lavender dark:border-gray-600">Queue Depth by Region</span>
+            <span className="px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs text-text-secondary border border-surface-grey-lavender dark:border-gray-600">Cost per Claim</span>
           </div>
         </div>
       </div>
@@ -682,8 +682,8 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
 
   if (currentResponse?.error && chartPanels.length === 0) {
     return (
-      <div className="bg-surface-off-white p-4">
-        <div className="bg-white border-l-4 border-status-alert p-6 rounded-r-xl shadow-sm">
+      <div className="bg-surface-off-white dark:bg-gray-900 p-4">
+        <div className="bg-white dark:bg-gray-800 border-l-4 border-status-alert p-6 rounded-r-xl shadow-sm">
           <h2 className="type-h2 text-brand-deep-purple mb-2">Unable to Process</h2>
           <p className="type-body text-brand-deep-purple">{currentResponse.error.message}</p>
           {currentResponse.error.suggestions && (
@@ -691,7 +691,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
               <p className="text-sm text-text-secondary mb-2">Try asking about:</p>
               <div className="flex flex-wrap gap-2">
                 {currentResponse.error.suggestions.map((s, i) => (
-                  <span key={i} className="px-3 py-1 bg-surface-purple-light rounded-full text-xs text-brand-deep-purple">
+                  <span key={i} className="px-3 py-1 bg-surface-purple-light dark:bg-gray-700 rounded-full text-xs text-brand-deep-purple dark:text-gray-200">
                     {s}
                   </span>
                 ))}
@@ -713,13 +713,13 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
             <h2 className="text-sm font-display font-semibold text-brand-deep-purple">
               Dashboard
             </h2>
-            <span className="text-xs text-text-secondary bg-surface-purple-light px-2 py-0.5 rounded-full font-mono">
+            <span className="text-xs text-text-secondary bg-surface-purple-light dark:bg-gray-700 px-2 py-0.5 rounded-full font-mono">
               {chartPanels.length} {chartPanels.length === 1 ? 'chart' : 'charts'}
             </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {!isMobile && (
-              <div className="flex bg-white border border-surface-grey-lavender rounded-lg overflow-hidden">
+              <div className="flex bg-white dark:bg-gray-800 border border-surface-grey-lavender dark:border-gray-700 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setLayoutMode('single')}
                   className={`p-1.5 transition-colors ${layoutMode === 'single' ? 'bg-brand-purple text-white' : 'text-text-secondary hover:text-brand-purple'}`}
@@ -742,7 +742,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
               <button
                 onClick={handleLoadDashboards}
                 disabled={loadingDashboards}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-brand-purple hover:bg-surface-purple-light rounded-lg transition-colors border border-surface-grey-lavender"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-brand-purple hover:bg-surface-purple-light dark:hover:bg-gray-700 rounded-lg transition-colors border border-surface-grey-lavender dark:border-gray-700"
                 data-testid="btn-load-dashboard"
                 title="Load saved dashboard"
               >
@@ -750,7 +750,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
                 {loadingDashboards ? "Loading..." : "Load"}
               </button>
               {showLoadMenu && (
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-surface-grey-lavender rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 border border-surface-grey-lavender dark:border-gray-700 rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
                   {savedDashboards.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-text-secondary">No saved dashboards</div>
                   ) : (
@@ -758,7 +758,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
                       <div
                         key={d.id}
                         onClick={() => handleSelectDashboard(d)}
-                        className="flex items-center justify-between px-3 py-2 hover:bg-surface-purple-light cursor-pointer group"
+                        className="flex items-center justify-between px-3 py-2 hover:bg-surface-purple-light dark:hover:bg-gray-700 cursor-pointer group"
                         data-testid={`dashboard-item-${d.id}`}
                       >
                         <div className="flex-1 min-w-0">
@@ -779,7 +779,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
                   )}
                   <button
                     onClick={() => setShowLoadMenu(false)}
-                    className="w-full px-3 py-1.5 text-xs text-text-secondary hover:bg-gray-50 border-t border-surface-grey-lavender"
+                    className="w-full px-3 py-1.5 text-xs text-text-secondary hover:bg-gray-50 dark:hover:bg-gray-700 border-t border-surface-grey-lavender dark:border-gray-700"
                   >
                     Close
                   </button>
@@ -789,7 +789,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
             <button
               onClick={handleSaveDashboard}
               disabled={saving || chartPanels.length === 0}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-brand-purple hover:bg-surface-purple-light rounded-lg transition-colors border border-brand-purple-light disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-brand-purple hover:bg-surface-purple-light dark:hover:bg-gray-700 rounded-lg transition-colors border border-brand-purple-light disabled:opacity-50"
               data-testid="btn-save-dashboard"
               title="Save dashboard"
             >
@@ -799,7 +799,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
             {chartPanels.length > 1 && (
               <button
                 onClick={onClearPanels}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-surface-grey-lavender"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-surface-grey-lavender dark:border-gray-700"
                 data-testid="btn-clear-all"
                 title="Clear all charts"
               >
@@ -812,7 +812,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
       )}
 
       {isLoading && (
-        <div className="bg-white rounded-xl border border-brand-purple/20 p-8 flex items-center justify-center animate-pulse">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-brand-purple/20 p-8 flex items-center justify-center animate-pulse">
           <Loader2 className="w-6 h-6 text-brand-purple animate-spin mr-3" />
           <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
         </div>
@@ -834,8 +834,8 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
       </div>
 
       {currentResponse?.error && chartPanels.length > 0 && (
-        <div className="bg-white border-l-4 border-status-alert p-4 rounded-r-xl shadow-sm">
-          <p className="text-sm text-brand-deep-purple">{currentResponse.error.message}</p>
+        <div className="bg-white dark:bg-gray-800 border-l-4 border-status-alert p-4 rounded-r-xl shadow-sm">
+          <p className="text-sm text-brand-deep-purple dark:text-gray-200">{currentResponse.error.message}</p>
         </div>
       )}
 
