@@ -6,10 +6,23 @@ interface KPIMetric {
   value: string | number;
   unit?: string;
   trend?: "up" | "down" | "neutral";
+  delta?: number;
 }
 
 interface KPICardsProps {
   clientId: string;
+}
+
+function getTrendColor(label: string, trend: "up" | "down" | "neutral"): string {
+  if (trend === "neutral") return "text-text-secondary";
+  if (label === "Claims This Week") return "text-text-secondary";
+  if (label === "Queue Depth" || label === "SLA Breach Rate") {
+    return trend === "up" ? "text-red-500" : "text-green-600";
+  }
+  if (label === "Closed This Week") {
+    return trend === "up" ? "text-green-600" : "text-red-500";
+  }
+  return "text-text-secondary";
 }
 
 export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
@@ -51,6 +64,11 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId }) => {
               <span className="text-xs font-normal text-text-secondary ml-0.5">{kpi.unit}</span>
             )}
           </p>
+          {kpi.trend && kpi.trend !== "neutral" && kpi.delta !== undefined && (
+            <p className={`text-[10px] md:text-xs font-medium mt-0.5 ${getTrendColor(kpi.label, kpi.trend)}`} data-testid={`kpi-trend-${kpi.label.toLowerCase().replace(/\s+/g, "-")}`}>
+              {kpi.trend === "up" ? "▲" : "▼"} {kpi.delta}%
+            </p>
+          )}
         </Card>
       ))}
     </div>
