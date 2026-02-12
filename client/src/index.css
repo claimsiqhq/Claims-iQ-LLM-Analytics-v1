@@ -72,6 +72,12 @@
   }
   body {
     @apply font-body antialiased bg-background text-foreground selection:bg-brand-purple-light selection:text-brand-deep-purple text-[16px];
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (pointer: coarse) {
+    button, [role="button"], a {
+      touch-action: manipulation;
+    }
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;

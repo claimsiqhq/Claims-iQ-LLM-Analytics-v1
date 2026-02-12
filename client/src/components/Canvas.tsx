@@ -39,11 +39,12 @@ interface DynamicChartProps {
   onChartClick?: (data: any) => void;
   currentMetric?: string;
   compact?: boolean;
+  isMobile?: boolean;
 }
 
 const ZOOM_THRESHOLD = 18;
 
-const DynamicChart = React.memo(({ response, onChartClick, currentMetric, compact }: DynamicChartProps) => {
+const DynamicChart = React.memo(({ response, onChartClick, currentMetric, compact, isMobile }: DynamicChartProps) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number } | null>(null);
@@ -68,7 +69,7 @@ const DynamicChart = React.memo(({ response, onChartClick, currentMetric, compac
   const unit = datasets[0]?.unit || '';
   const chartHeight = compact ? 250 : 350;
   const hasData = labels.length > 0 && datasets.some((ds) => ds.values.some((v) => v != null && v !== 0));
-  const showBrush = !compact && chartData.length > ZOOM_THRESHOLD;
+  const showBrush = !compact && !isMobile && chartData.length > ZOOM_THRESHOLD;
   const brushStart = brushRange?.startIndex ?? 0;
   const brushEnd = brushRange?.endIndex ?? Math.min(chartData.length - 1, ZOOM_THRESHOLD - 1);
   const animDuration = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1500;
@@ -433,9 +434,10 @@ interface ChartPanelProps {
   onFollowUpClick?: (question: string) => void;
   clientId: string;
   isLatest?: boolean;
+  isMobile?: boolean;
 }
 
-const ChartPanel = React.memo(({ response, compact, onRemove, onChartClick, onFollowUpClick, clientId, isLatest }: ChartPanelProps) => {
+const ChartPanel = React.memo(({ response, compact, onRemove, onChartClick, onFollowUpClick, clientId, isLatest, isMobile }: ChartPanelProps) => {
   const [chartTypeOverride, setChartTypeOverride] = useState<string | null>(null);
   const chartAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -505,6 +507,7 @@ const ChartPanel = React.memo(({ response, compact, onRemove, onChartClick, onFo
             onChartClick={onChartClick}
             currentMetric={response.chart?.title}
             compact={compact}
+            isMobile={isMobile}
           />
         </div>
 
@@ -559,13 +562,13 @@ const ChartPanel = React.memo(({ response, compact, onRemove, onChartClick, onFo
 
       {!compact && response.followUpSuggestions && response.followUpSuggestions.length > 0 && (
         <div className="px-4 md:px-6 pb-3 md:pb-4">
-          <div className="flex flex-wrap gap-1.5" data-testid="follow-up-suggestions">
+          <div className="flex flex-wrap gap-2" data-testid="follow-up-suggestions">
             <span className="text-xs text-text-secondary font-medium self-center mr-1">Ask next:</span>
             {response.followUpSuggestions.map((q, i) => (
               <button
                 key={i}
                 onClick={() => onFollowUpClick?.(q)}
-                className="px-2.5 py-1 bg-white dark:bg-gray-700 border border-brand-purple-light dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple transition-colors cursor-pointer"
+                className="min-h-[44px] px-3 py-2 bg-white dark:bg-gray-700 border border-brand-purple-light dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple transition-colors cursor-pointer touch-manipulation"
                 data-testid={`btn-followup-${i}`}
               >
                 {q}
@@ -913,6 +916,7 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
             onFollowUpClick={onFollowUpClick}
             clientId={clientId}
             isLatest={idx === 0}
+            isMobile={isMobile}
           />
         ))}
       </div>

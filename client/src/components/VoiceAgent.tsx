@@ -451,7 +451,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         </button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className={cn("p-4 space-y-3", isMobile && "flex-1 overflow-y-auto min-h-0")}>
         {isActive && (
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1.5 text-green-600">
@@ -473,7 +473,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         )}
 
         {history.length > 0 && (
-          <div className="max-h-32 overflow-y-auto space-y-2 rounded-xl bg-surface-purple-light/30 dark:bg-gray-800/50 p-3">
+          <div className={cn("overflow-y-auto space-y-2 rounded-xl bg-surface-purple-light/30 dark:bg-gray-800/50 p-3", isMobile ? "max-h-24" : "max-h-32")}>
             {history.map((item, i) => (
               <div key={i} className={cn("text-xs", item.role === "user" ? "text-brand-deep-purple dark:text-gray-200" : "text-text-secondary")}>
                 <span className="font-medium">{item.role === "user" ? "You: " : "Claims IQ: "}</span>
@@ -485,13 +485,13 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         )}
 
         {QUICK_PROMPTS.length > 0 && status === "connected" && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             <span className="text-xs text-text-secondary w-full">Quick prompts:</span>
             {QUICK_PROMPTS.map((q, i) => (
               <button
                 key={i}
                 onClick={() => handleFunctionCall(`quick-${i}`, "ask_claims_question", JSON.stringify({ question: q }))}
-                className="px-2.5 py-1 bg-surface-purple-light dark:bg-gray-700 hover:bg-brand-purple/20 dark:hover:bg-gray-600 rounded-lg text-xs text-brand-deep-purple dark:text-gray-200 transition-colors"
+                className="min-h-[44px] px-3 py-2 bg-surface-purple-light dark:bg-gray-700 hover:bg-brand-purple/20 dark:hover:bg-gray-600 rounded-lg text-xs text-brand-deep-purple dark:text-gray-200 transition-colors touch-manipulation"
               >
                 {q}
               </button>
@@ -567,6 +567,12 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
           <p className="text-center text-xs text-text-secondary">
             Ask about claims data — charts will appear on your dashboard
           </p>
+        )}
+      </div>
+    </div>
+  );
+};
+p>
         )}
       </div>
     </div>

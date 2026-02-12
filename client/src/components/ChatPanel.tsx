@@ -690,7 +690,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
                         if (!activeThreadId || activeThreadId === 'new') onThreadSelect('new');
                         handleSend(chip.label);
                       }}
-                      className="px-3 py-1.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 transition-colors"
+                      className="min-h-[44px] px-4 py-2.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 transition-colors touch-manipulation"
                     >
                       {chip.label}
                     </button>
@@ -732,7 +732,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
                 if (!activeThreadId || activeThreadId === 'new') onThreadSelect('new');
                 handleSend(chip.label);
               }}
-              className="whitespace-nowrap px-3 py-1.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple-light transition-colors shadow-sm"
+              className="whitespace-nowrap min-h-[44px] px-4 py-2.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 hover:border-brand-purple-light transition-colors shadow-sm touch-manipulation shrink-0"
             >
               {chip.label}
             </button>
@@ -760,7 +760,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
             onClick={() => handleSend()}
             disabled={isLoading || inputValue.trim().length === 0}
             className={cn(
-              "absolute right-2 bottom-2.5 p-1.5 rounded-full transition-all duration-200",
+              "absolute right-2 bottom-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all duration-200 touch-manipulation",
               inputValue.length > 0 && !isLoading
                 ? "bg-brand-purple text-white shadow-md transform scale-100"
                 : "bg-surface-grey-lavender text-text-secondary pointer-events-none opacity-50 transform scale-90"
