@@ -30,6 +30,7 @@ import {
   Bell,
   Palette,
   ChevronRight,
+  Download,
 } from "lucide-react";
 
 interface DataSummary {
@@ -84,7 +85,7 @@ export function SettingsPage({ onBack, clientId }: { onBack: () => void; clientI
         </div>
       </div>
 
-      <div className="pt-14 max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="pt-20 max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-white dark:bg-gray-800 border border-border p-1 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-1 h-auto">
             <TabsTrigger
@@ -277,6 +278,17 @@ function DataImportSection({ clientId }: { clientId?: string }) {
           <CardDescription>
             Upload an Excel file (.xlsx) with claims data. The file should have tabs named: claims, adjusters, claim_policies, claim_estimates, claim_billing
           </CardDescription>
+          <div className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/api/settings/spreadsheet-template", "_blank")}
+              data-testid="btn-download-template"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download template
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start gap-2 p-3 bg-brand-purple/10 border border-brand-purple/20 rounded-lg">
@@ -483,6 +495,9 @@ function PreferencesSection({ clientId }: { clientId?: string }) {
                   <SelectItem value="area">Area Chart</SelectItem>
                   <SelectItem value="pie">Pie Chart</SelectItem>
                   <SelectItem value="stacked_bar">Stacked Bar</SelectItem>
+                  <SelectItem value="table">Table</SelectItem>
+                  <SelectItem value="heatmap">Heatmap</SelectItem>
+                  <SelectItem value="waterfall">Waterfall</SelectItem>
                 </SelectContent>
               </Select>
             </div>

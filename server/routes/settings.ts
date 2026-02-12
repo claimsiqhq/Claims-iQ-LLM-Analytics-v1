@@ -336,6 +336,40 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
   }
 });
 
+settingsRouter.get("/api/settings/spreadsheet-template", (_req: Request, res: Response) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    const claimsHeaders = [
+      "claim_number", "claimant_name", "peril", "severity", "region", "state_code", "status", "current_stage",
+      "assigned_adjuster_id", "assigned_at", "fnol_date", "date_of_loss", "first_touch_at", "closed_at",
+      "reserve_amount", "paid_amount", "sla_target_days", "sla_breached", "has_issues", "reopen_count",
+    ];
+    const adjustersHeaders = ["full_name", "email", "team", "active", "adjuster_number", "adjuster_type", "company"];
+    const policiesHeaders = [
+      "claim_id", "policy_number", "policy_type", "coverage_type", "coverage_amount", "deductible",
+      "endorsements", "roof_replacement_included", "replacement_cost_value", "actual_cash_value",
+    ];
+    const estimatesHeaders = [
+      "claim_id", "estimate_number", "estimate_version", "estimated_amount",
+      "depreciation_amount", "replacement_cost",
+    ];
+    const billingHeaders = ["claim_id", "billing_type", "expense_category", "amount", "description", "vendor_name"];
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([claimsHeaders]), "claims");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([adjustersHeaders]), "adjusters");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([policiesHeaders]), "claim_policies");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([estimatesHeaders]), "claim_estimates");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([billingHeaders]), "claim_billing");
+
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="ClaimsIQ_import_template.xlsx"');
+    res.send(buf);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 settingsRouter.get("/api/settings/data-summary", async (req: Request, res: Response) => {
   try {
     const clientId = (req.query.client_id as string) || await getDefaultClientId();
