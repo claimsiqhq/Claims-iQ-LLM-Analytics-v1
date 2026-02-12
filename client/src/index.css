@@ -40,6 +40,8 @@
   --color-border: var(--color-surface-grey-lavender);
   --color-input: var(--color-surface-white);
   --color-ring: var(--color-brand-purple-light);
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: var(--color-brand-deep-purple);
 
   --radius-sm: 8px;
   --radius-md: 12px;

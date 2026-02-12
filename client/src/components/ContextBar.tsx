@@ -44,14 +44,14 @@ export const ContextBar = ({ clientId, onClientChange }: ContextBarProps) => {
         <div className="h-4 w-[1px] bg-white/20"></div>
 
         <Select value={clientId} onValueChange={onClientChange}>
-          <SelectTrigger className="w-48 bg-white/10 border-white/20 text-white hover:bg-white/20">
+          <SelectTrigger className="w-48 bg-white/10 border-white/20 text-white hover:bg-white/20" data-testid="select-client-trigger">
             <SelectValue placeholder="Select client">
               {selectedClient ? selectedClient.name : "Select client"}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white border-surface-grey-lavender shadow-lg">
             {clients.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
+              <SelectItem key={c.id} value={c.id} className="text-brand-deep-purple hover:bg-surface-purple-light focus:bg-surface-purple-light focus:text-brand-deep-purple" data-testid={`select-client-${c.id}`}>
                 {c.name}
               </SelectItem>
             ))}

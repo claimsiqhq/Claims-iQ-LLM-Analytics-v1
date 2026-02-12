@@ -164,48 +164,46 @@ function generateLLMUsage(claims: any[]): any[] {
   return usage;
 }
 
-export async function runSeed(): Promise<void> {
-  const supabase = getSupabaseClient();
-  console.log("Seeding data into Supabase...");
+const ADJUSTER_NAMES = [
+  { first: "James", last: "Mitchell" }, { first: "Sarah", last: "Chen" },
+  { first: "Marcus", last: "Williams" }, { first: "Elena", last: "Rodriguez" },
+  { first: "David", last: "Park" }, { first: "Rachel", last: "Thompson" },
+  { first: "Kevin", last: "O'Brien" }, { first: "Aisha", last: "Patel" },
+  { first: "Tyler", last: "Anderson" }, { first: "Maria", last: "Gonzalez" },
+  { first: "Brian", last: "Foster" }, { first: "Linda", last: "Kim" },
+];
+const TEAMS = ["Team Alpha", "Team Bravo"];
 
-  const { data: existingClients } = await supabase.from("clients").select("id, name").order("created_at", { ascending: true });
-  if (!existingClients?.length) {
-    throw new Error("No clients found in database. Please create a client first.");
-  }
-  const clientId = existingClients[0].id;
-  const clientName = existingClients[0].name;
-  console.log(`  Using client: ${clientName} (${clientId})`);
+async function seedClient(supabase: any, clientId: string, clientName: string): Promise<void> {
+  console.log(`\n--- Seeding client: ${clientName} (${clientId}) ---`);
 
-  const { data: existingUsers } = await supabase.from("users").select("id, email").order("created_at", { ascending: true }).limit(1);
-  if (!existingUsers?.length) {
-    throw new Error("No users found in database. Please create a user first.");
-  }
-  const userId = existingUsers[0].id;
-  console.log(`  Using user: ${existingUsers[0].email} (${userId})`);
-
-  const { data: existingAdjusters } = await supabase.from("adjusters").select("id").eq("client_id", clientId);
+  let { data: existingAdjusters } = await supabase.from("adjusters").select("id").eq("client_id", clientId);
   if (!existingAdjusters?.length) {
-    throw new Error(`No adjusters found for client ${clientName}. Please create adjusters first.`);
+    console.log(`  No adjusters found for ${clientName} — creating ${ADJUSTER_NAMES.length} adjusters...`);
+    const newAdjusters = ADJUSTER_NAMES.map((name, idx) => ({
+      client_id: clientId,
+      full_name: `${name.first} ${name.last}`,
+      email: `${name.first.toLowerCase()}.${name.last.toLowerCase()}@${clientName.toLowerCase().replace(/\s+/g, "")}.com`,
+      team: TEAMS[idx < 6 ? 0 : 1],
+    }));
+    const { data: inserted, error } = await supabase.from("adjusters").insert(newAdjusters).select("id");
+    if (error) {
+      console.error(`  Failed to create adjusters: ${error.message}`);
+      return;
+    }
+    existingAdjusters = inserted;
+    console.log(`  Created ${inserted.length} adjusters`);
   }
-  const adjusterIds = existingAdjusters.map((a) => a.id);
-  console.log(`  Found ${adjusterIds.length} adjusters for this client`);
+  const adjusterIds = existingAdjusters.map((a: any) => a.id);
+  console.log(`  Using ${adjusterIds.length} adjusters`);
 
-  console.log("  Upserting metric definitions...");
-  for (const metric of METRIC_DEFINITIONS) {
-    const { error } = await supabase.from("metric_definitions").upsert(
-      { ...metric, is_active: true },
-      { onConflict: "slug" }
-    );
-    if (error) console.log(`  Metric ${metric.slug}: ${error.message}`);
-  }
-
-  console.log("  Cleaning old claim data for this client...");
+  console.log("  Cleaning old claim data...");
   const { data: oldClaimIds } = await supabase.from("claims").select("id").eq("client_id", clientId);
   if (oldClaimIds?.length) {
-    const ids = oldClaimIds.map((c) => c.id);
-    const batchSize = 100;
-    for (let i = 0; i < ids.length; i += batchSize) {
-      const batch = ids.slice(i, i + batchSize);
+    const ids = oldClaimIds.map((c: any) => c.id);
+    const cleanBatch = 100;
+    for (let i = 0; i < ids.length; i += cleanBatch) {
+      const batch = ids.slice(i, i + cleanBatch);
       await supabase.from("claim_llm_usage").delete().in("claim_id", batch);
       await supabase.from("claim_reviews").delete().in("claim_id", batch);
       await supabase.from("claim_stage_history").delete().in("claim_id", batch);
@@ -215,15 +213,15 @@ export async function runSeed(): Promise<void> {
   }
 
   await supabase.from("morning_briefs").delete().eq("client_id", clientId);
-  await supabase.from("thread_turns").delete().in(
-    "thread_id",
-    (await supabase.from("threads").select("id").eq("client_id", clientId)).data?.map((t) => t.id) || []
-  );
+  const threadIds = (await supabase.from("threads").select("id").eq("client_id", clientId)).data?.map((t: any) => t.id) || [];
+  if (threadIds.length) {
+    await supabase.from("thread_turns").delete().in("thread_id", threadIds);
+  }
   await supabase.from("threads").delete().eq("client_id", clientId);
-  console.log("  Cleaned old briefs and threads");
 
-  console.log("  Generating 500 claims...");
-  const claims = generateClaims(500, clientId, adjusterIds);
+  const claimCount = 500;
+  console.log(`  Generating ${claimCount} claims...`);
+  const claims = generateClaims(claimCount, clientId, adjusterIds);
 
   console.log("  Inserting claims...");
   const batchSize = 50;
@@ -244,11 +242,11 @@ export async function runSeed(): Promise<void> {
     .eq("client_id", clientId);
 
   if (!insertedClaims?.length) {
-    console.error("No claims found after insert!");
+    console.error("  No claims found after insert!");
     return;
   }
 
-  const claimMap = new Map(insertedClaims.map((c) => [c.claim_number, c.id]));
+  const claimMap = new Map(insertedClaims.map((c: any) => [c.claim_number, c.id]));
   console.log(`  Mapped ${claimMap.size} claims`);
 
   console.log("  Inserting stage history...");
@@ -308,10 +306,37 @@ export async function runSeed(): Promise<void> {
     }
   }
 
-  console.log("\nSeeding complete!");
-  console.log(`  Client: ${clientName}`);
-  console.log(`  Claims: ${claims.length}`);
-  console.log(`  Stage history: ${stageHistory.length} records`);
-  console.log(`  Reviews: ${reviews.length} records`);
-  console.log(`  LLM usage: ${llmUsage.length} records`);
+  console.log(`  Done! ${clientName}: ${claims.length} claims, ${stageHistory.length} stage records, ${reviews.length} reviews, ${llmUsage.length} LLM usage records`);
+}
+
+export async function runSeed(): Promise<void> {
+  const supabase = getSupabaseClient();
+  console.log("Seeding data into Supabase...");
+
+  const { data: existingClients } = await supabase.from("clients").select("id, name").order("created_at", { ascending: true });
+  if (!existingClients?.length) {
+    throw new Error("No clients found in database. Please create a client first.");
+  }
+  console.log(`Found ${existingClients.length} clients to seed`);
+
+  const { data: existingUsers } = await supabase.from("users").select("id, email").order("created_at", { ascending: true }).limit(1);
+  if (!existingUsers?.length) {
+    throw new Error("No users found in database. Please create a user first.");
+  }
+  console.log(`  Using user: ${existingUsers[0].email} (${existingUsers[0].id})`);
+
+  console.log("  Upserting metric definitions...");
+  for (const metric of METRIC_DEFINITIONS) {
+    const { error } = await supabase.from("metric_definitions").upsert(
+      { ...metric, is_active: true },
+      { onConflict: "slug" }
+    );
+    if (error) console.log(`  Metric ${metric.slug}: ${error.message}`);
+  }
+
+  for (const client of existingClients) {
+    await seedClient(supabase, client.id, client.name);
+  }
+
+  console.log("\n=== Seeding complete for all clients! ===");
 }
