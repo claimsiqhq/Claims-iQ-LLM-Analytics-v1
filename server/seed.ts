@@ -3,9 +3,10 @@ import XLSX from "xlsx";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const SPREADSHEET_PATH = path.resolve(__dirname, "../attached_assets/claims_iq_all_50_claims_1770882172302.xlsx");
+const __seed_dirname = typeof __dirname !== "undefined"
+  ? __dirname
+  : path.dirname(fileURLToPath(import.meta.url));
+const SPREADSHEET_PATH = path.resolve(__seed_dirname, "../attached_assets/claims_iq_all_50_claims_1770882172302.xlsx");
 
 function readSpreadsheet() {
   const wb = XLSX.readFile(SPREADSHEET_PATH);

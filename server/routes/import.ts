@@ -3,8 +3,8 @@ import { getSupabaseClient } from "../config/supabase";
 import path from "path";
 import { createRequire } from "module";
 
-const require = createRequire(import.meta.url);
-const XLSX = require("xlsx");
+const _require = typeof require !== "undefined" ? require : createRequire(import.meta.url);
+const XLSX = _require("xlsx");
 
 export const importRouter = Router();
 

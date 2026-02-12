@@ -6,8 +6,8 @@ import { createRequire } from "module";
 import { getSupabaseClient, supabase } from "../config/supabase";
 import { getDefaultClientId } from "../config/defaults";
 
-const require = createRequire(import.meta.url);
-const XLSX = require("xlsx");
+const _require = typeof require !== "undefined" ? require : createRequire(import.meta.url);
+const XLSX = _require("xlsx");
 
 export const settingsRouter = Router();
 
