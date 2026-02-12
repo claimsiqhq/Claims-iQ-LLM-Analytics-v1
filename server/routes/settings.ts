@@ -224,12 +224,26 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       result.imported.adjusters = adjustersInserted;
     }
 
-    const EXCLUDED_STATUSES = new Set(["denied", "closed"]);
-    const filteredClaims = claimsSheet.filter((row: any) => {
-      const status = (row.status || "open").toLowerCase();
-      return !EXCLUDED_STATUSES.has(status);
-    });
-    result.skipped = { deniedOrClosed: claimsSheet.length - filteredClaims.length };
+    const STATUS_REMAP: Record<string, string> = {
+      denied: "in_review",
+      closed: "open",
+      closed_no_payment: "open",
+    };
+    let statusRemapped = 0;
+    for (const row of claimsSheet) {
+      const raw = (row.status || "open").toLowerCase();
+      if (STATUS_REMAP[raw]) {
+        row.status = STATUS_REMAP[raw];
+        if (row.current_stage === "closed" || row.current_stage === "denied") {
+          row.current_stage = "in_review";
+        }
+        row.closed_at = null;
+        statusRemapped++;
+      }
+    }
+    const filteredClaims = claimsSheet;
+    result.skipped = { deniedOrClosed: 0 };
+    result.statusRemapped = statusRemapped;
 
     shiftDatesIntoLastNDays(filteredClaims, 90);
 
@@ -248,7 +262,6 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       const allNewClaims = filteredClaims.map((row: any) => {
         const adjUuid = adjusterIdMap[row.assigned_adjuster_id] || null;
         let status = row.status || "open";
-        if (status === "closed_no_payment") status = "closed";
         const rawSeverity = (row.severity || "").toLowerCase();
         const severity = SEVERITY_MAP[rawSeverity] || "medium";
         const peril = row.peril || "Other";
@@ -256,7 +269,9 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
         const assignedAt = row.assigned_at ? new Date(row.assigned_at).toISOString() : fnolDate;
         const firstTouchAt = row.first_touch_at ? new Date(row.first_touch_at).toISOString() : fnolDate;
 
-        const claimantName = (!row.claimant_name || row.claimant_name === "REDACTED" || row.claimant_name.trim() === "") ? generateName() : row.claimant_name;
+        const rawName = row.claimant_name || "";
+        const needsName = !rawName || rawName === "REDACTED" || rawName.trim() === "" || /^Insured\s*#/i.test(rawName);
+        const claimantName = needsName ? generateName() : rawName;
 
         return {
           client_id: clientId,
