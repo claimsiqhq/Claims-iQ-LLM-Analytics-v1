@@ -206,8 +206,8 @@ function App() {
 
           <main className="flex-1 h-full overflow-y-auto w-full relative">
             <div
-              className="pt-24 p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
-              style={!isMobile ? { marginLeft: `${chatWidth}px` } : undefined}
+              className="px-4 pb-4 md:px-6 md:pb-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
+              style={{ paddingTop: "6rem", ...(!isMobile ? { marginLeft: `${chatWidth}px` } : {}) }}
             >
               <KPICards clientId={selectedClientId} />
               <MorningBrief clientId={selectedClientId} />
