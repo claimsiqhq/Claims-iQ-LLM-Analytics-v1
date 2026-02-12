@@ -110,14 +110,25 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     if (adjustersSheet.length > 0) {
       for (let i = 0; i < adjustersSheet.length; i++) {
         const adj = adjustersSheet[i];
-        const adjCode = `ADJ-${String(i + 1).padStart(3, "0")}`;
         const { data: inserted, error } = await sb
           .from("adjusters")
-          .insert({ client_id: clientId, full_name: adj.full_name, email: adj.email, team: adj.team })
+          .insert({
+            client_id: clientId,
+            full_name: adj.full_name,
+            email: adj.email,
+            team: adj.team,
+            active: adj.active !== false,
+            adjuster_number: adj.adjuster_number ? String(adj.adjuster_number) : null,
+            adjuster_type: adj.adjuster_type || "field",
+            company: adj.company || "Pilot Catastrophe Services",
+          })
           .select("id")
           .single();
         if (!error && inserted) {
-          adjusterIdMap[adjCode] = inserted.id;
+          if (adj.adjuster_number) {
+            adjusterIdMap[`ADJ-${adj.adjuster_number}`] = inserted.id;
+          }
+          adjusterIdMap[`ADJ-${String(i + 1).padStart(3, "0")}`] = inserted.id;
         }
       }
       result.imported.adjusters = Object.keys(adjusterIdMap).length;

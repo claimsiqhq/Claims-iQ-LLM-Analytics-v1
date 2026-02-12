@@ -48,7 +48,21 @@ const METRIC_DEFINITIONS = [
   { slug: "deductible_analysis", display_name: "Deductible Analysis", category: "policy", description: "Distribution and average of policy deductibles", calculation: "AVG(deductible) FROM claim_policies", unit: "dollars", default_chart_type: "bar", allowed_dimensions: ["policy_type", "coverage_type"], allowed_time_grains: ["day", "week", "month"] },
 ];
 
-const STAGES = ["fnol", "investigation", "evaluation", "negotiation", "settlement", "closed"];
+const STAGE_ORDER = [
+  "fnol_received",
+  "under_review",
+  "inspection_scheduled",
+  "inspection_complete",
+  "estimate_in_progress",
+  "estimate_review",
+  "supplement_review",
+  "approved",
+  "payment_pending",
+  "payment_issued",
+  "closed_settled",
+  "closed_denied",
+  "reopened",
+];
 const MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20250929", "gpt-4o"];
 
 function randomChoice<T>(arr: T[]): T {
@@ -61,7 +75,7 @@ function randomInt(min: number, max: number): number {
 function generateStageHistory(claims: any[], adjusterIdMap: Map<string, string>): any[] {
   const history: any[] = [];
   for (const claim of claims) {
-    const stageIdx = STAGES.indexOf(claim.current_stage);
+    const stageIdx = STAGE_ORDER.indexOf(claim.current_stage);
     if (stageIdx < 0) continue;
     if (!claim.fnol_date && !claim.date_of_loss && !claim.assigned_at) continue;
     const fnolDate = new Date(claim.fnol_date || claim.date_of_loss || claim.assigned_at);
@@ -71,7 +85,7 @@ function generateStageHistory(claims: any[], adjusterIdMap: Map<string, string>)
       ? (closedAt.getTime() - fnolDate.getTime()) / 86400000
       : (Date.now() - fnolDate.getTime()) / 86400000;
     const stagesCount = stageIdx + 1;
-    const avgDwell = totalDays / stagesCount;
+    const avgDwell = Math.max(0.5, totalDays / stagesCount);
 
     for (let s = 0; s <= stageIdx; s++) {
       const isLast = s === stageIdx;
@@ -83,7 +97,7 @@ function generateStageHistory(claims: any[], adjusterIdMap: Map<string, string>)
         : new Date(currentTime.getTime() + dwellDays * 86400000);
       history.push({
         claim_id: claim._dbId,
-        stage: STAGES[s],
+        stage: STAGE_ORDER[s],
         entered_at: currentTime.toISOString(),
         exited_at: exitTime?.toISOString() || null,
         adjuster_id: adjusterIdMap.get(claim.assigned_adjuster_id) || null,
@@ -98,9 +112,10 @@ function generateStageHistory(claims: any[], adjusterIdMap: Map<string, string>)
 function generateLLMUsage(claims: any[]): any[] {
   const usage: any[] = [];
   for (const claim of claims) {
-    const stageIdx = STAGES.indexOf(claim.current_stage);
+    const stageIdx = STAGE_ORDER.indexOf(claim.current_stage);
     if (stageIdx < 0) continue;
-    for (let s = 0; s <= Math.min(stageIdx, 3); s++) {
+    const maxLLMStages = Math.min(stageIdx, 4);
+    for (let s = 0; s <= maxLLMStages; s++) {
       const callCount = randomInt(1, 3);
       for (let c = 0; c < callCount; c++) {
         const model = randomChoice(MODELS);
@@ -117,7 +132,7 @@ function generateLLMUsage(claims: any[]): any[] {
         usage.push({
           claim_id: claim._dbId,
           model,
-          stage: STAGES[s],
+          stage: STAGE_ORDER[s],
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           cost_usd: Math.round(cost * 10000) / 10000,
@@ -360,6 +375,10 @@ async function seedClient(supabase: any, clientId: string, clientName: string, d
 
   const adjusterIdMap = new Map<string, string>();
   insertedAdj.forEach((a: any, idx: number) => {
+    const adjNum = data.adjusters[idx]?.adjuster_number;
+    if (adjNum) {
+      adjusterIdMap.set(`ADJ-${adjNum}`, a.id);
+    }
     adjusterIdMap.set(`ADJ-${String(idx + 1).padStart(3, "0")}`, a.id);
   });
   const adjusterDbIds = insertedAdj.map((a: any) => a.id);
