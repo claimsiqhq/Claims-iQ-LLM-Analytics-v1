@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -14,16 +14,19 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  Brush,
 } from 'recharts';
 import { FilterList, Download, Refresh } from 'iconoir-react';
 import { Info, Loader2, X, LayoutGrid, LayoutList, Trash2, Save, FolderOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useTheme } from 'next-themes';
 import emptyStateImg from "@/assets/empty-state.png";
 import type { ChartResponse } from "@/App";
 import { DrillDownPanel } from "@/components/DrillDownPanel";
 import { DataTable } from "@/components/DataTable";
 import { ExportMenu } from "@/components/ExportMenu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { saveDashboard, getDashboards, deleteDashboard } from "@/lib/api";
 
 const CHART_COLORS = [
@@ -38,7 +41,17 @@ interface DynamicChartProps {
   compact?: boolean;
 }
 
-const DynamicChart = ({ response, onChartClick, currentMetric, compact }: DynamicChartProps) => {
+const ZOOM_THRESHOLD = 18;
+
+const DynamicChart = React.memo(({ response, onChartClick, currentMetric, compact }: DynamicChartProps) => {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number } | null>(null);
+
+  useEffect(() => {
+    setBrushRange(null);
+  }, [response.turn_id, response.chart?.type]);
+
   if (!response.chart?.data) return null;
 
   const { type, data, title } = response.chart;
@@ -54,6 +67,18 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
 
   const unit = datasets[0]?.unit || '';
   const chartHeight = compact ? 250 : 350;
+  const hasData = labels.length > 0 && datasets.some((ds) => ds.values.some((v) => v != null && v !== 0));
+  const showBrush = !compact && chartData.length > ZOOM_THRESHOLD;
+  const brushStart = brushRange?.startIndex ?? 0;
+  const brushEnd = brushRange?.endIndex ?? Math.min(chartData.length - 1, ZOOM_THRESHOLD - 1);
+  const animDuration = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1500;
+
+  const textColor = isDark ? '#e8e0f0' : '#342A4F';
+  const tickColor = isDark ? '#9d8bbf' : '#6B6280';
+  const gridColor = isDark ? '#3d3548' : '#E3DFE8';
+  const tooltipBg = isDark ? '#24202f' : '#342A4F';
+  const tooltipLabel = isDark ? '#cdbff7' : '#9D8BBF';
+  const cursorFill = isDark ? 'rgba(119,99,183,0.2)' : 'rgba(240,230,250,0.4)';
 
   const formatValue = (val: number) => {
     if (unit === 'percentage') return `${val}%`;
@@ -73,7 +98,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
   const xAxisProps = {
     ...commonAxisProps,
     dataKey: "name",
-    tick: { fill: '#6B6280', fontSize: compact ? 10 : 11, fontFamily: 'Source Sans Pro' },
+    tick: { fill: tickColor, fontSize: compact ? 10 : 11, fontFamily: 'Source Sans Pro' },
     dy: 10,
     interval: 0 as const,
     angle: labels.length > 6 ? -45 : 0,
@@ -88,17 +113,32 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
   };
 
   const tooltipProps = {
-    cursor: { fill: '#F0E6FA', opacity: 0.4 },
+    cursor: { fill: cursorFill },
     contentStyle: {
-      backgroundColor: '#342A4F',
+      backgroundColor: tooltipBg,
       border: 'none',
       borderRadius: '8px',
       boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      color: '#fff',
+      color: isDark ? '#e8e0f0' : '#fff',
     },
     formatter: (value: number) => [formatValue(value), ''],
-    labelStyle: { color: '#9D8BBF', marginBottom: '4px', fontFamily: 'Source Sans Pro', fontWeight: 600 },
+    labelStyle: { color: tooltipLabel, marginBottom: '4px', fontFamily: 'Source Sans Pro', fontWeight: 600 },
   };
+
+  const legendFormatter = (value: string) => (
+    <span style={{ color: textColor, fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>
+  );
+
+  const emptyChart = (
+    <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center p-6" role="status" aria-label="No chart data">
+      <p className="text-text-secondary text-sm font-medium">No data to display</p>
+      <p className="text-text-secondary text-xs mt-1">Try adjusting filters or time range</p>
+    </div>
+  );
+
+  if (!hasData) {
+    return emptyChart;
+  }
 
   if (type === 'table') {
     return (
@@ -138,7 +178,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
             label={compact ? false : ({ name, value0 }) => `${name}: ${formatValue(value0)}`}
             outerRadius={compact ? 80 : 120}
             dataKey="value0"
-            animationDuration={1500}
+            animationDuration={animDuration}
             onClick={handleChartClick}
           >
             {chartData.map((_, idx) => (
@@ -156,15 +196,11 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
     return (
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} onClick={handleChartClick}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
           <Tooltip {...tooltipProps} />
-          <Legend
-            wrapperStyle={{ paddingTop: '10px' }}
-            iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
-          />
+          <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" formatter={legendFormatter} />
           {datasets.map((ds, idx) => (
             <Bar
               key={idx}
@@ -173,7 +209,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
               stackId="stack"
               fill={CHART_COLORS[idx % CHART_COLORS.length]}
               radius={[4, 4, 0, 0]}
-              animationDuration={1500}
+              animationDuration={animDuration}
             />
           ))}
         </BarChart>
@@ -243,7 +279,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
     return (
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={waterfallData} margin={{ top: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
           <XAxis {...xAxisProps} />
           <YAxis {...yAxisProps} />
           <Tooltip
@@ -258,7 +294,7 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
               ) : null
             }
           />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} animationDuration={animDuration}>
             {waterfallData.map((entry, idx) => (
               <Cell key={idx} fill={entry.value >= 0 ? CHART_COLORS[0] : CHART_COLORS[4]} />
             ))}
@@ -270,76 +306,104 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
 
   if (type === 'line') {
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <LineChart data={chartData} onClick={handleChartClick}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
-          <XAxis {...xAxisProps} />
-          <YAxis {...yAxisProps} />
-          <Tooltip {...tooltipProps} />
-          <Legend
-            wrapperStyle={{ paddingTop: '10px' }}
-            iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
-          />
-          {datasets.map((ds, idx) => (
-            <Line
-              key={idx}
-              type="monotone"
-              dataKey={`value${idx}`}
-              name={ds.label}
-              stroke={CHART_COLORS[idx]}
-              strokeWidth={2.5}
-              dot={{ fill: CHART_COLORS[idx], r: compact ? 3 : 4 }}
-              animationDuration={1500}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={`Line chart: ${title}`}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <LineChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+            <XAxis {...xAxisProps} />
+            <YAxis {...yAxisProps} />
+            <Tooltip {...tooltipProps} />
+            <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" formatter={legendFormatter} />
+            {datasets.map((ds, idx) => (
+              <Line
+                key={idx}
+                type="monotone"
+                dataKey={`value${idx}`}
+                name={ds.label}
+                stroke={CHART_COLORS[idx]}
+                strokeWidth={2.5}
+                dot={{ fill: CHART_COLORS[idx], r: compact ? 3 : 4 }}
+                animationDuration={animDuration}
+              />
+            ))}
+            {showBrush && (
+              <Brush
+                dataKey="name"
+                height={28}
+                stroke={gridColor}
+                fill={isDark ? '#2d2438' : '#f0e6fa'}
+                startIndex={brushStart}
+                endIndex={brushEnd}
+                onChange={(e) => {
+                  const v = e as { startIndex?: number; endIndex?: number };
+                  if (v?.startIndex != null && v?.endIndex != null) {
+                    setBrushRange({ startIndex: v.startIndex, endIndex: v.endIndex });
+                  }
+                }}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 
   if (type === 'area') {
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <AreaChart data={chartData} onClick={handleChartClick}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
-          <XAxis {...xAxisProps} />
-          <YAxis {...yAxisProps} />
-          <Tooltip {...tooltipProps} />
-          <Legend
-            wrapperStyle={{ paddingTop: '10px' }}
-            iconType="circle"
-            formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
-          />
-          {datasets.map((ds, idx) => (
-            <Area
-              key={idx}
-              type="monotone"
-              dataKey={`value${idx}`}
-              name={ds.label}
-              stroke={CHART_COLORS[idx]}
-              fill={CHART_COLORS[idx]}
-              fillOpacity={0.2}
-              animationDuration={1500}
-            />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={`Area chart: ${title}`}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <AreaChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+            <XAxis {...xAxisProps} />
+            <YAxis {...yAxisProps} />
+            <Tooltip {...tooltipProps} />
+            <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" formatter={legendFormatter} />
+            {datasets.map((ds, idx) => (
+              <Area
+                key={idx}
+                type="monotone"
+                dataKey={`value${idx}`}
+                name={ds.label}
+                stroke={CHART_COLORS[idx]}
+                fill={CHART_COLORS[idx]}
+                fillOpacity={0.2}
+                animationDuration={animDuration}
+              />
+            ))}
+            {showBrush && (
+              <Brush
+                dataKey="name"
+                height={28}
+                stroke={gridColor}
+                fill={isDark ? '#2d2438' : '#f0e6fa'}
+                startIndex={brushStart}
+                endIndex={brushEnd}
+                onChange={(e) => {
+                  const v = e as { startIndex?: number; endIndex?: number };
+                  if (v?.startIndex != null && v?.endIndex != null) {
+                    setBrushRange({ startIndex: v.startIndex, endIndex: v.endIndex });
+                  }
+                }}
+              />
+            )}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
+
+  const barLabel = !compact && chartData.length <= 12
+    ? { position: 'top' as const, formatter: (v: number) => formatValue(v), fill: textColor, fontSize: 10 }
+    : undefined;
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart data={chartData} barGap={4} onClick={handleChartClick}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E3DFE8" />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
         <XAxis {...xAxisProps} />
         <YAxis {...yAxisProps} />
         <Tooltip {...tooltipProps} />
-        <Legend
-          wrapperStyle={{ paddingTop: '10px' }}
-          iconType="circle"
-          formatter={(value) => <span style={{ color: '#342A4F', fontSize: compact ? '11px' : '14px', fontFamily: 'Source Sans Pro', fontWeight: 500 }}>{value}</span>}
-        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" formatter={legendFormatter} />
         {datasets.map((ds, idx) => (
           <Bar
             key={idx}
@@ -348,13 +412,16 @@ const DynamicChart = ({ response, onChartClick, currentMetric, compact }: Dynami
             fill={CHART_COLORS[idx]}
             radius={[4, 4, 0, 0]}
             barSize={Math.max(16, Math.min(40, 400 / chartData.length))}
-            animationDuration={1500}
+            animationDuration={animDuration}
+            label={datasets.length === 1 ? barLabel : undefined}
           />
         ))}
       </BarChart>
     </ResponsiveContainer>
   );
-};
+});
+
+DynamicChart.displayName = "DynamicChart";
 
 const CHART_TYPES = ["bar", "line", "area", "pie", "stacked_bar", "table", "heatmap", "waterfall"] as const;
 
@@ -368,7 +435,7 @@ interface ChartPanelProps {
   isLatest?: boolean;
 }
 
-const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick, clientId, isLatest }: ChartPanelProps) => {
+const ChartPanel = React.memo(({ response, compact, onRemove, onChartClick, onFollowUpClick, clientId, isLatest }: ChartPanelProps) => {
   const [chartTypeOverride, setChartTypeOverride] = useState<string | null>(null);
   const chartAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -554,7 +621,9 @@ const ChartPanel = ({ response, compact, onRemove, onChartClick, onFollowUpClick
       )}
     </div>
   );
-};
+});
+
+ChartPanel.displayName = "ChartPanel";
 
 interface CanvasProps {
   activeThreadId: string | null;
@@ -652,9 +721,17 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
 
   if (isLoading && chartPanels.length === 0) {
     return (
-      <div className="bg-surface-off-white dark:bg-gray-900 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
-        <Loader2 className="w-12 h-12 text-brand-purple animate-spin mb-4" />
-        <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
+      <div className="bg-surface-off-white dark:bg-gray-900 p-6 md:p-8 min-h-[300px]">
+        <Skeleton className="h-6 w-3/4 max-w-md mb-4" />
+        <Skeleton className="h-4 w-1/2 mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-[350px] rounded-xl" />
+          <Skeleton className="h-[350px] rounded-xl" />
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-16" />
+        </div>
       </div>
     );
   }
@@ -812,9 +889,16 @@ export const Canvas = ({ activeThreadId, currentResponse, chartPanels, isLoading
       )}
 
       {isLoading && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-brand-purple/20 p-8 flex items-center justify-center animate-pulse">
-          <Loader2 className="w-6 h-6 text-brand-purple animate-spin mr-3" />
-          <p className="text-brand-purple-secondary text-sm">Analyzing your question...</p>
+        <div className="rounded-xl border border-brand-purple/20 overflow-hidden">
+          <div className="p-4 flex items-center gap-3">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-5 w-20" />
+          </div>
+          <Skeleton className="h-[350px] w-full" />
+          <div className="p-4 flex justify-between">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-12" />
+          </div>
         </div>
       )}
 

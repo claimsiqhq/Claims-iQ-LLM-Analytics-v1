@@ -1,29 +1,57 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Mic, MicOff, Phone, PhoneOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Phone, PhoneOff, Loader2, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChartResponse } from "@/App";
 
+const QUICK_PROMPTS = [
+  "SLA breach rate by adjuster",
+  "Claims received this month",
+  "Cycle time by peril",
+  "Severity distribution",
+  "Cost per claim by model",
+];
+
 type VoiceStatus = "idle" | "connecting" | "connected" | "speaking" | "listening" | "error";
+
+interface HistoryItem {
+  role: "user" | "assistant";
+  text: string;
+}
 
 interface VoiceAgentProps {
   clientId: string;
   onNewResponse: (response: ChartResponse) => void;
   isMobile: boolean;
+  activeThreadId?: string | null;
 }
 
-export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse, isMobile }) => {
+export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse, isMobile, activeThreadId }) => {
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [transcript, setTranscript] = useState("");
   const [aiTranscript, setAiTranscript] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const historyEndRef = useRef<HTMLDivElement>(null);
 
   const pendingFunctionCalls = useRef<Map<string, { name: string; arguments: string }>>(new Map());
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiTranscriptRef = useRef("");
+
+  useEffect(() => {
+    if (muted && streamRef.current) {
+      streamRef.current.getAudioTracks().forEach((t) => { t.enabled = false; });
+    } else if (!muted && streamRef.current) {
+      streamRef.current.getAudioTracks().forEach((t) => { t.enabled = true; });
+    }
+  }, [muted]);
 
   const cleanup = useCallback(() => {
     if (dcRef.current) {
@@ -48,7 +76,12 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
   }, []);
 
   useEffect(() => {
-    return cleanup;
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      cleanup();
+    };
   }, [cleanup]);
 
   const handleFunctionCall = useCallback(async (callId: string, name: string, args: string) => {
@@ -65,8 +98,8 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
       return;
     }
 
+    let question: string;
     try {
-      let question: string;
       try {
         const parsed = JSON.parse(args);
         question = parsed.question;
@@ -79,6 +112,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: question,
+          thread_id: activeThreadId || null,
           client_id: clientId,
         }),
       });
@@ -104,6 +138,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         },
       }));
       dcRef.current?.send(JSON.stringify({ type: "response.create" }));
+      setHistory((h) => [...h, { role: "user", text: question }, { role: "assistant", text: summaryForVoice }]);
     } catch (err: any) {
       dcRef.current?.send(JSON.stringify({
         type: "conversation.item.create",
@@ -114,8 +149,9 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         },
       }));
       dcRef.current?.send(JSON.stringify({ type: "response.create" }));
+      setHistory((h) => [...h, { role: "user", text: question }, { role: "assistant", text: "Sorry, I couldn't fetch that data." }]);
     }
-  }, [clientId, onNewResponse]);
+  }, [clientId, onNewResponse, activeThreadId]);
 
   const connect = useCallback(async () => {
     try {
@@ -159,6 +195,37 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
 
       dc.onopen = () => {
         setStatus("connected");
+        setReconnectAttempts(0);
+      };
+
+      const attemptReconnect = () => {
+        setReconnectAttempts((r) => {
+          if (r < 2) {
+            setErrorMessage("Reconnecting...");
+            reconnectTimeoutRef.current = setTimeout(() => {
+              cleanup();
+              connect();
+            }, 2000);
+            return r + 1;
+          }
+          return r;
+        });
+      };
+
+      dc.onclose = () => {
+        if (pcRef.current?.connectionState !== "closed") {
+          setStatus("error");
+          setErrorMessage("Connection closed");
+          attemptReconnect();
+        }
+      };
+
+      pcRef.current.onconnectionstatechange = () => {
+        if (pcRef.current?.connectionState === "failed" || pcRef.current?.connectionState === "disconnected") {
+          setStatus("error");
+          setErrorMessage("Connection lost");
+          attemptReconnect();
+        }
       };
 
       dc.onmessage = (event) => {
@@ -177,13 +244,16 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
 
             case "conversation.item.input_audio_transcription.completed":
               if (msg.transcript) {
-                setTranscript(msg.transcript.trim());
+                const t = msg.transcript.trim();
+                setTranscript(t);
+                setHistory((h) => [...h, { role: "user", text: t }]);
               }
               break;
 
             case "response.audio_transcript.delta":
               if (msg.delta) {
-                setAiTranscript(prev => prev + msg.delta);
+                aiTranscriptRef.current += msg.delta;
+                setAiTranscript(aiTranscriptRef.current);
                 setStatus("speaking");
               }
               break;
@@ -194,6 +264,11 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
 
             case "response.done":
               setStatus("connected");
+              const aiText = aiTranscriptRef.current;
+              if (aiText) {
+                setHistory((h) => [...h, { role: "assistant", text: aiText }]);
+              }
+              aiTranscriptRef.current = "";
               setTimeout(() => setAiTranscript(""), 5000);
               break;
 
@@ -377,6 +452,53 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
       </div>
 
       <div className="p-4 space-y-3">
+        {isActive && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 text-green-600">
+              <Wifi className="w-3.5 h-3.5" />
+              {status === "connected" || status === "listening" || status === "speaking" ? "Connected" : "Connecting"}
+            </span>
+            <button
+              onClick={() => setMuted((m) => !m)}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors",
+                muted ? "bg-red-500/20 text-red-600" : "bg-white/10 text-white/80 hover:bg-white/20"
+              )}
+              title={muted ? "Unmute microphone" : "Mute microphone"}
+            >
+              {muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              {muted ? "Unmute" : "Mute"}
+            </button>
+          </div>
+        )}
+
+        {history.length > 0 && (
+          <div className="max-h-32 overflow-y-auto space-y-2 rounded-xl bg-surface-purple-light/30 dark:bg-gray-800/50 p-3">
+            {history.map((item, i) => (
+              <div key={i} className={cn("text-xs", item.role === "user" ? "text-brand-deep-purple dark:text-gray-200" : "text-text-secondary")}>
+                <span className="font-medium">{item.role === "user" ? "You: " : "Claims IQ: "}</span>
+                {item.text}
+              </div>
+            ))}
+            <div ref={historyEndRef} />
+          </div>
+        )}
+
+        {QUICK_PROMPTS.length > 0 && status === "connected" && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-xs text-text-secondary w-full">Quick prompts:</span>
+            {QUICK_PROMPTS.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => handleFunctionCall(`quick-${i}`, "ask_claims_question", JSON.stringify({ question: q }))}
+                className="px-2.5 py-1 bg-surface-purple-light dark:bg-gray-700 hover:bg-brand-purple/20 dark:hover:bg-gray-600 rounded-lg text-xs text-brand-deep-purple dark:text-gray-200 transition-colors"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+
         {status === "listening" && (
           <div className="flex items-center gap-2 justify-center py-2">
             <div className="flex items-end gap-1 h-8">

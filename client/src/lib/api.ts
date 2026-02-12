@@ -1,19 +1,48 @@
 const API_BASE = "/api";
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit & { signal?: AbortSignal } = {},
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok || res.status < 500) return res;
+      lastError = new Error(res.statusText);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("Request failed");
+    }
+    if (options.signal?.aborted) throw lastError;
+    if (attempt < maxRetries - 1) {
+      const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 export async function askQuestion(
   message: string,
   threadId: string | null,
-  clientId?: string
+  clientId?: string,
+  signal?: AbortSignal
 ): Promise<any> {
-  const res = await fetch(`${API_BASE}/ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      thread_id: threadId,
-      client_id: clientId,
-    }),
-  });
+  const res = await fetchWithRetry(
+    `${API_BASE}/ask`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        thread_id: threadId,
+        client_id: clientId,
+      }),
+      signal,
+    },
+    2
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(err.error || "Request failed");
@@ -71,7 +100,7 @@ export async function getDrilldown(
     page_size: String(pageSize),
     filters: JSON.stringify(filters),
   });
-  const res = await fetch(`${API_BASE}/drilldown?${params}`);
+  const res = await fetchWithRetry(`${API_BASE}/drilldown?${params}`);
   if (!res.ok) throw new Error("Failed to load drilldown data");
   return res.json();
 }

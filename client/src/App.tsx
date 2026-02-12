@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { ContextBar } from "@/components/ContextBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Canvas } from "@/components/Canvas";
@@ -7,10 +7,13 @@ import { MorningBrief } from "@/components/MorningBrief";
 import { KPICards } from "@/components/KPICards";
 import { Toaster } from "@/components/ui/toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { MessageCircle } from 'lucide-react';
-import { VoiceAgent } from "@/components/VoiceAgent";
-import { SettingsPage } from "@/pages/SettingsPage";
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { Walkthrough, shouldShowWalkthrough } from "@/components/Walkthrough";
+
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+import { OfflineBanner } from "@/components/OfflineBanner";
+
+const VoiceAgent = lazy(() => import("@/components/VoiceAgent").then((m) => ({ default: m.VoiceAgent })));
 
 export interface ChartResponse {
   thread_id: string;
@@ -149,7 +152,9 @@ function App() {
     return (
       <ErrorBoundary>
         <div className="min-h-screen bg-surface-off-white dark:bg-gray-900 font-body text-brand-deep-purple dark:text-gray-100 selection:bg-brand-purple-light">
-          <SettingsPage onBack={() => setShowSettings(false)} clientId={selectedClientId} />
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-brand-purple" /></div>}>
+            <SettingsPage onBack={() => setShowSettings(false)} clientId={selectedClientId} />
+          </Suspense>
           <Toaster />
         </div>
       </ErrorBoundary>
@@ -158,6 +163,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <OfflineBanner />
       <div className="min-h-screen bg-surface-off-white dark:bg-gray-900 font-body text-brand-deep-purple dark:text-gray-100 selection:bg-brand-purple-light overflow-hidden">
         <ContextBar
           clientId={selectedClientId}
@@ -252,11 +258,14 @@ function App() {
           </button>
         )}
 
-        <VoiceAgent
-          clientId={selectedClientId}
-          onNewResponse={handleNewResponse}
-          isMobile={isMobile}
-        />
+        <Suspense fallback={null}>
+          <VoiceAgent
+            clientId={selectedClientId}
+            onNewResponse={handleNewResponse}
+            isMobile={isMobile}
+            activeThreadId={activeThreadId}
+          />
+        </Suspense>
 
         <Walkthrough isOpen={walkthroughOpen} onClose={() => setWalkthroughOpen(false)} />
 

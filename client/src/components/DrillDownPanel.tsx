@@ -96,6 +96,7 @@ export const DrillDownPanel: React.FC<DrillDownPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: keyof ClaimRecord; direction: "asc" | "desc" }>({
     key: "ageInDays",
     direction: "desc",
@@ -120,7 +121,8 @@ export const DrillDownPanel: React.FC<DrillDownPanelProps> = ({
       );
       const data = result.data || [];
       const total = result.total ?? data.length;
-      setClaims((Array.isArray(data) ? data : []).map(mapClaim));
+      const newClaims = (Array.isArray(data) ? data : []).map(mapClaim);
+      setClaims((prev) => (currentPage === 1 ? newClaims : [...prev, ...newClaims]));
       setTotalCount(total);
       if (result.summary) setSummaryStats(result.summary);
       else if (data.length > 0) {
@@ -290,7 +292,17 @@ export const DrillDownPanel: React.FC<DrillDownPanelProps> = ({
         </div>
 
         {!loading && !error && totalPages > 1 && (
-          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 space-y-3">
+            {currentPage < totalPages && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setCurrentPage((p) => p + 1)}
+                disabled={loading}
+              >
+                {loading ? "Loading..." : `Load more (${claims.length} of ${totalCount})`}
+              </Button>
+            )}
             <Pagination>
               <PaginationContent>
                 <PaginationItem>

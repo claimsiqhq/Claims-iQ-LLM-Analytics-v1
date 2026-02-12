@@ -10,6 +10,7 @@ import {
   MoreHoriz
 } from 'iconoir-react';
 import { PieChart as PieChartIcon, BarChart3 as BarChartIcon, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Share, StickyNote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from "@/lib/utils";
@@ -314,7 +315,10 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<Array<{ id: string; turnId: string | null; note: string; createdAt: string }>>([]);
   const [sharing, setSharing] = useState(false);
+  const [threadHistoryLoading, setThreadHistoryLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const askAbortRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
   const loadThreads = useCallback(async () => {
@@ -330,6 +334,20 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     loadThreads();
   }, [loadThreads]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   const loadAnnotations = useCallback(async (threadId: string) => {
     try {
       const data = await getAnnotations(threadId);
@@ -340,6 +358,8 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
   }, []);
 
   const loadThreadHistory = useCallback(async (threadId: string) => {
+    setThreadHistoryLoading(true);
+    setChatMessages([]);
     try {
       const data = await getThread(threadId);
       if (data.turns) {
@@ -390,6 +410,8 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
       }
     } catch (err) {
       console.error('Failed to load thread:', err);
+    } finally {
+      setThreadHistoryLoading(false);
     }
   }, [onNewResponse, loadAnnotations]);
 
@@ -427,6 +449,9 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     const msg = (messageOverride ?? inputValue).trim();
     if (!msg || isLoading) return;
 
+    askAbortRef.current?.abort();
+    askAbortRef.current = new AbortController();
+
     if (!messageOverride) setInputValue('');
     setView('chat');
     setIsLoading(true);
@@ -439,7 +464,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
     setChatMessages((prev) => [...prev, userMsg]);
 
     try {
-      const response = await askQuestion(msg, currentThreadId, clientId);
+      const response = await askQuestion(msg, currentThreadId, clientId, askAbortRef.current.signal);
 
       if (response.thread_id && !currentThreadId) {
         setCurrentThreadId(response.thread_id);
@@ -469,6 +494,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
         onNewResponse(response);
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       setChatMessages((prev) => [
         ...prev,
         {
@@ -643,12 +669,33 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
           </div>
         ) : (
           <div className="p-4 animate-in slide-in-from-right-8 duration-300">
-            {chatMessages.length === 0 && !isLoading ? (
-              <div className="text-center mt-10 opacity-60">
+            {threadHistoryLoading ? (
+              <div className="space-y-4 mt-4">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-20 w-full rounded-xl" />
+              </div>
+            ) : chatMessages.length === 0 && !isLoading ? (
+              <div className="text-center mt-10">
                 <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
                   <Plus className="w-6 h-6 text-brand-purple" />
                 </div>
-                <p className="text-sm text-text-secondary">Ask a question about your claims data</p>
+                <p className="text-sm text-text-secondary mb-4">Ask a question about your claims data</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {promptChips.map((chip, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        if (!activeThreadId || activeThreadId === 'new') onThreadSelect('new');
+                        handleSend(chip.label);
+                      }}
+                      className="px-3 py-1.5 bg-white dark:bg-gray-700 border border-surface-grey-lavender dark:border-gray-600 rounded-full text-xs text-brand-deep-purple dark:text-gray-200 hover:bg-surface-purple-light dark:hover:bg-gray-600 transition-colors"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               chatMessages.map(m => (
@@ -694,6 +741,7 @@ export const ChatPanel = ({ activeThreadId, onThreadSelect, onNewResponse, isLoa
 
         <div className="relative group">
           <textarea
+            ref={inputRef}
             data-testid="input-message"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

@@ -39,7 +39,7 @@ import {
 import { queryCache } from "./engine/queryCache";
 import { log } from "./index";
 import { runSeed } from "./seed";
-import { getDefaultClientId, getDefaultUserId, invalidateDefaultsCache } from "./config/defaults";
+import { getDefaultClientId, getDefaultUserId, getClientPreferences, invalidateDefaultsCache } from "./config/defaults";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -123,6 +123,7 @@ export async function registerRoutes(
       }
 
       const metrics = await getMetrics();
+      const preferences = await getClientPreferences(resolvedClientId).catch(() => null);
 
       let threadId = thread_id;
       let context: ThreadContext = createEmptyContext();
@@ -149,7 +150,8 @@ export async function registerRoutes(
       const { intent, llmResponse: intentLlm } = await parseIntent(
         message,
         metrics,
-        context.metric ? context : null
+        context.metric ? context : null,
+        { preferences }
       );
 
       const validation = validateIntent(intent, metrics);

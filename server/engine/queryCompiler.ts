@@ -630,7 +630,7 @@ export function formatChartDataForComparison(
     const compMap = new Map<string, number>();
     rawDataComparison.forEach((r) => compMap.set(getDimLabel(r), parseVal(r)));
 
-    const allLabels = Array.from(new Set([...currentMap.keys(), ...compMap.keys()]));
+    const allLabels = Array.from(new Set([...Array.from(currentMap.keys()), ...Array.from(compMap.keys())]));
     allLabels.sort();
 
     return {

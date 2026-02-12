@@ -55,3 +55,29 @@ export function invalidateDefaultsCache(): void {
   cachedDefaultUserId = null;
   cacheTimestamp = 0;
 }
+
+const TIME_RANGE_MAP: Record<string, string> = {
+  "7d": "last_7_days",
+  "30d": "last_30_days",
+  "90d": "last_90_days",
+};
+
+export async function getClientPreferences(clientId: string): Promise<{
+  default_chart_type: string;
+  default_time_range: string;
+} | null> {
+  try {
+    const { data } = await supabase
+      .from("client_preferences")
+      .select("default_chart_type, default_time_range")
+      .eq("client_id", clientId)
+      .single();
+    if (!data) return null;
+    return {
+      default_chart_type: data.default_chart_type || "bar",
+      default_time_range: TIME_RANGE_MAP[data.default_time_range] || data.default_time_range || "last_30_days",
+    };
+  } catch {
+    return null;
+  }
+}
