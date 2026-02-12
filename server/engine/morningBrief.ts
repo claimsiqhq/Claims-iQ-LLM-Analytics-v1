@@ -94,6 +94,7 @@ export class MorningBriefGenerator {
   private async gatherMetricsSnapshot(clientId: string): Promise<MorningBriefSnapshot> {
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
 
     const todayStart = `${today}T00:00:00`;
     const todayEnd = `${today}T23:59:59`;
@@ -104,14 +105,15 @@ export class MorningBriefGenerator {
       .from("claims")
       .select("id")
       .eq("client_id", clientId)
-      .in("current_stage", ["fnol", "investigation", "evaluation", "negotiation"]);
+      .in("status", ["open", "in_progress"]);
 
     const queueDepth = openClaims?.length || 0;
 
     const { data: slaData } = await supabase
       .from("claims")
       .select("id, sla_breached")
-      .eq("client_id", clientId);
+      .eq("client_id", clientId)
+      .gte("fnol_date", thirtyDaysAgo);
     const total = slaData?.length || 0;
     const breached = slaData?.filter((c) => c.sla_breached)?.length || 0;
     const slaBreachRate = total > 0 ? breached / total : 0;
@@ -139,9 +141,9 @@ export class MorningBriefGenerator {
 
     const { data: slaRisks } = await supabase
       .from("claims")
-      .select("id, claim_number, severity, fnol_date")
+      .select("id, claim_number, severity, sla_target_days, fnol_date")
       .eq("client_id", clientId)
-      .in("current_stage", ["fnol", "investigation", "evaluation", "negotiation"])
+      .in("status", ["open", "in_progress"])
       .order("fnol_date", { ascending: true })
       .limit(5);
 
@@ -149,7 +151,7 @@ export class MorningBriefGenerator {
       const fnolDate = new Date(claim.fnol_date);
       const now = new Date();
       const daysElapsed = Math.floor((now.getTime() - fnolDate.getTime()) / 86400000);
-      const slaDays = 30;
+      const slaDays = claim.sla_target_days || 30;
       const daysRemaining = Math.max(0, slaDays - daysElapsed);
       return {
         claimId: claim.id,

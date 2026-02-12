@@ -94,6 +94,21 @@ export class QueryCache {
     return crypto.createHash("md5").update(keyParts.join(":")).digest("hex");
   }
 
+  async cleanAllCache(): Promise<number> {
+    try {
+      const { data, error } = await supabase
+        .from("query_cache")
+        .delete()
+        .neq("cache_key", "")
+        .select("cache_key");
+      if (error) throw new Error(`Cache full cleanup failed: ${error.message}`);
+      return data?.length || 0;
+    } catch (error) {
+      console.error("Cache full cleanup error:", error);
+      return 0;
+    }
+  }
+
   async cleanExpiredCache(): Promise<number> {
     try {
       const now = new Date().toISOString();

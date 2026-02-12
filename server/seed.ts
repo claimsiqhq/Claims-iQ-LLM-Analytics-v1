@@ -1,8 +1,4 @@
 import { getSupabaseClient } from "./config/supabase";
-import crypto from "crypto";
-
-const CLIENT_ID = crypto.randomUUID();
-const USER_ID = crypto.randomUUID();
 
 const METRIC_DEFINITIONS = [
   { slug: "claims_received", display_name: "Claims Received", category: "throughput", description: "Total number of new claims filed in the selected period", calculation: "COUNT(*) FROM claims WHERE fnol_date BETWEEN start AND end", unit: "count", default_chart_type: "line", allowed_dimensions: ["day", "week", "month", "peril", "region"], allowed_time_grains: ["day", "week", "month"] },
@@ -11,7 +7,7 @@ const METRIC_DEFINITIONS = [
   { slug: "cycle_time_e2e", display_name: "Cycle Time (E2E)", category: "speed_sla", description: "Average days from first notice of loss to claim closure", calculation: "AVG(closed_at - fnol_date) in days", unit: "days", default_chart_type: "line", allowed_dimensions: ["peril", "region", "severity", "adjuster"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "stage_dwell_time", display_name: "Stage Dwell Time", category: "speed_sla", description: "Average days a claim spends in each processing stage", calculation: "AVG(dwell_days) FROM claim_stage_history GROUP BY stage", unit: "days", default_chart_type: "stacked_bar", allowed_dimensions: ["stage", "adjuster"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "time_to_first_touch", display_name: "Time to First Touch", category: "speed_sla", description: "Average hours from FNOL to first action taken on a claim", calculation: "AVG(first_touch_at - fnol_date) in hours", unit: "hours", default_chart_type: "bar", allowed_dimensions: ["adjuster", "peril"], allowed_time_grains: ["day", "week", "month"] },
-  { slug: "sla_breach_rate", display_name: "SLA Breach Rate", category: "speed_sla", description: "Percentage of claims that exceeded their SLA target days", calculation: "AVG(CASE WHEN sla_breached THEN 1 ELSE 0 END)", unit: "percentage", default_chart_type: "line", allowed_dimensions: ["adjuster", "peril", "region", "stage"], allowed_time_grains: ["day", "week", "month"] },
+  { slug: "sla_breach_rate", display_name: "SLA Breach Rate", category: "speed_sla", description: "Percentage of claims that exceeded their SLA target days", calculation: "AVG(CASE WHEN sla_breached THEN 1 ELSE 0 END)", unit: "percentage", default_chart_type: "bar", allowed_dimensions: ["adjuster", "peril", "region", "stage"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "sla_breach_count", display_name: "SLA Breach Count", category: "speed_sla", description: "Total number of claims that breached SLA thresholds", calculation: "COUNT(*) FROM claims WHERE sla_breached = true", unit: "count", default_chart_type: "bar", allowed_dimensions: ["adjuster", "peril", "region", "stage"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "issue_rate", display_name: "Issue Rate", category: "quality", description: "Percentage of claims flagged with one or more issues", calculation: "AVG(CASE WHEN has_issues THEN 1 ELSE 0 END)", unit: "percentage", default_chart_type: "bar", allowed_dimensions: ["issue_type", "adjuster", "stage"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "re_review_count", display_name: "Re-Review Count", category: "quality", description: "Number of claims that required re-review after initial assessment", calculation: "COUNT(*) FROM claim_reviews WHERE review_type = re_review", unit: "count", default_chart_type: "bar", allowed_dimensions: ["adjuster", "peril", "severity"], allowed_time_grains: ["day", "week", "month"] },
@@ -22,21 +18,6 @@ const METRIC_DEFINITIONS = [
   { slug: "llm_latency", display_name: "LLM Latency", category: "cost_llm", description: "Average response time of LLM calls in milliseconds", calculation: "AVG(latency_ms) FROM claim_llm_usage", unit: "milliseconds", default_chart_type: "line", allowed_dimensions: ["model", "stage"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "severity_distribution", display_name: "Severity Distribution", category: "risk", description: "Breakdown of claims by severity level", calculation: "COUNT(*) FROM claims GROUP BY severity", unit: "count", default_chart_type: "bar", allowed_dimensions: ["peril", "region"], allowed_time_grains: ["day", "week", "month"] },
   { slug: "high_severity_trend", display_name: "High-Severity Trend", category: "risk", description: "Trend of high and critical severity claims over time", calculation: "COUNT(*) FROM claims WHERE severity IN (high, critical) GROUP BY month", unit: "count", default_chart_type: "line", allowed_dimensions: ["peril", "region"], allowed_time_grains: ["day", "week", "month"] },
-];
-
-const ADJUSTERS = [
-  { id: crypto.randomUUID(), full_name: "Sarah Chen", email: "sarah.chen@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "Mike Torres", email: "mike.torres@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "Lisa Park", email: "lisa.park@acme.com", team: "Team Beta" },
-  { id: crypto.randomUUID(), full_name: "James Wilson", email: "james.wilson@acme.com", team: "Team Beta" },
-  { id: crypto.randomUUID(), full_name: "Maria Garcia", email: "maria.garcia@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "David Kim", email: "david.kim@acme.com", team: "Team Beta" },
-  { id: crypto.randomUUID(), full_name: "Rachel Adams", email: "rachel.adams@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "Tom Rodriguez", email: "tom.rodriguez@acme.com", team: "Team Beta" },
-  { id: crypto.randomUUID(), full_name: "Amy Liu", email: "amy.liu@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "Chris Johnson", email: "chris.johnson@acme.com", team: "Team Beta" },
-  { id: crypto.randomUUID(), full_name: "Nina Patel", email: "nina.patel@acme.com", team: "Team Alpha" },
-  { id: crypto.randomUUID(), full_name: "Brian Murphy", email: "brian.murphy@acme.com", team: "Team Beta" },
 ];
 
 const PERILS = ["Water Damage", "Fire", "Theft", "Wind/Hail", "Liability"];
@@ -62,7 +43,7 @@ function randomDate(start: Date, end: Date): Date {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
-function generateClaims(count: number): any[] {
+function generateClaims(count: number, clientId: string, adjusterIds: string[]): any[] {
   const claims: any[] = [];
   const now = new Date();
   const yearAgo = new Date(now);
@@ -74,7 +55,7 @@ function generateClaims(count: number): any[] {
     const severity = randomChoice(SEVERITIES);
     const fnol_date = randomDate(yearAgo, now);
     const isClosed = Math.random() < 0.55;
-    const status = isClosed ? "closed" : randomChoice(["open", "in_progress", "review", "reopened"] as const);
+    const status = isClosed ? "closed" : randomChoice(["open", "in_progress"] as const);
     const stageIdx = isClosed ? STAGES.length - 1 : randomInt(0, STAGES.length - 2);
     const current_stage = STAGES[stageIdx];
     const sla_target_days = severity === "critical" ? 14 : severity === "high" ? 21 : severity === "medium" ? 30 : 45;
@@ -88,15 +69,16 @@ function generateClaims(count: number): any[] {
     const paid_amount = isClosed ? reserve_amount * (0.3 + Math.random() * 0.7) : 0;
     const hasIssues = Math.random() < 0.25;
     const issue_types = hasIssues ? Array.from(new Set(Array.from({ length: randomInt(1, 3) }, () => randomChoice(ISSUE_TYPES)))) : [];
-    const reopen_count = status === "reopened" ? randomInt(1, 3) : 0;
+    const reopen_count = 0;
 
+    const monthNum = String(fnol_date.getMonth() + 1).padStart(2, "0");
     claims.push({
-      client_id: CLIENT_ID,
-      claim_number: `CLM-${fnol_date.getFullYear()}-${String(i + 1).padStart(5, "0")}`,
+      client_id: clientId,
+      claim_number: `CLM-${fnol_date.getFullYear()}-${monthNum}-${String(i + 1).padStart(3, "0")}`,
       claimant_name: `Claimant ${i + 1}`,
       peril: randomChoice(PERILS),
       severity, region, state_code, status, current_stage,
-      assigned_adjuster_id: randomChoice(ADJUSTERS).id,
+      assigned_adjuster_id: randomChoice(adjusterIds),
       assigned_at: assigned_at.toISOString(),
       fnol_date: fnol_date.toISOString(),
       first_touch_at: first_touch_at.toISOString(),
@@ -132,7 +114,7 @@ function generateStageHistory(claims: any[]): any[] {
   return history;
 }
 
-function generateReviews(claims: any[]): any[] {
+function generateReviews(claims: any[], adjusterIds: string[]): any[] {
   const reviews: any[] = [];
   for (const claim of claims) {
     const reviewCount = Math.random() < 0.4 ? randomInt(1, 3) : 0;
@@ -144,7 +126,7 @@ function generateReviews(claims: any[]): any[] {
       reviews.push({
         claim_number: claim.claim_number,
         review_type: randomChoice(reviewTypes),
-        reviewer_id: randomChoice(ADJUSTERS).id,
+        reviewer_id: randomChoice(adjusterIds),
         outcome: randomChoice(outcomes),
         llm_decision: randomChoice(llmDecisions),
         human_override: humanOverride,
@@ -184,37 +166,31 @@ function generateLLMUsage(claims: any[]): any[] {
 
 export async function runSeed(): Promise<void> {
   const supabase = getSupabaseClient();
-
   console.log("Seeding data into Supabase...");
 
-  console.log("  Inserting client...");
-  const { error: clientErr } = await supabase.from("clients").upsert({
-    id: CLIENT_ID, name: "Acme Insurance Group", slug: "acme-insurance", config: {},
-  }, { onConflict: "id" });
-  if (clientErr) console.log("  Client:", clientErr.message);
-
-  console.log("  Inserting user...");
-  const { error: userErr } = await supabase.from("users").upsert({
-    id: USER_ID, email: "admin@claimsiq.com", full_name: "Claims Manager", role: "claims_manager",
-  }, { onConflict: "id" });
-  if (userErr) console.log("  User:", userErr.message);
-
-  console.log("  Inserting user-client access...");
-  await supabase.from("user_client_access").upsert(
-    { user_id: USER_ID, client_id: CLIENT_ID },
-    { onConflict: "user_id,client_id" }
-  );
-
-  console.log("  Inserting adjusters...");
-  for (const adj of ADJUSTERS) {
-    const { error } = await supabase.from("adjusters").upsert(
-      { ...adj, client_id: CLIENT_ID, active: true },
-      { onConflict: "id" }
-    );
-    if (error) console.log(`  Adjuster ${adj.full_name}: ${error.message}`);
+  const { data: existingClients } = await supabase.from("clients").select("id, name").order("created_at", { ascending: true });
+  if (!existingClients?.length) {
+    throw new Error("No clients found in database. Please create a client first.");
   }
+  const clientId = existingClients[0].id;
+  const clientName = existingClients[0].name;
+  console.log(`  Using client: ${clientName} (${clientId})`);
 
-  console.log("  Inserting metric definitions...");
+  const { data: existingUsers } = await supabase.from("users").select("id, email").order("created_at", { ascending: true }).limit(1);
+  if (!existingUsers?.length) {
+    throw new Error("No users found in database. Please create a user first.");
+  }
+  const userId = existingUsers[0].id;
+  console.log(`  Using user: ${existingUsers[0].email} (${userId})`);
+
+  const { data: existingAdjusters } = await supabase.from("adjusters").select("id").eq("client_id", clientId);
+  if (!existingAdjusters?.length) {
+    throw new Error(`No adjusters found for client ${clientName}. Please create adjusters first.`);
+  }
+  const adjusterIds = existingAdjusters.map((a) => a.id);
+  console.log(`  Found ${adjusterIds.length} adjusters for this client`);
+
+  console.log("  Upserting metric definitions...");
   for (const metric of METRIC_DEFINITIONS) {
     const { error } = await supabase.from("metric_definitions").upsert(
       { ...metric, is_active: true },
@@ -223,8 +199,31 @@ export async function runSeed(): Promise<void> {
     if (error) console.log(`  Metric ${metric.slug}: ${error.message}`);
   }
 
+  console.log("  Cleaning old claim data for this client...");
+  const { data: oldClaimIds } = await supabase.from("claims").select("id").eq("client_id", clientId);
+  if (oldClaimIds?.length) {
+    const ids = oldClaimIds.map((c) => c.id);
+    const batchSize = 100;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      await supabase.from("claim_llm_usage").delete().in("claim_id", batch);
+      await supabase.from("claim_reviews").delete().in("claim_id", batch);
+      await supabase.from("claim_stage_history").delete().in("claim_id", batch);
+    }
+    await supabase.from("claims").delete().eq("client_id", clientId);
+    console.log(`  Cleaned ${oldClaimIds.length} old claims and related data`);
+  }
+
+  await supabase.from("morning_briefs").delete().eq("client_id", clientId);
+  await supabase.from("thread_turns").delete().in(
+    "thread_id",
+    (await supabase.from("threads").select("id").eq("client_id", clientId)).data?.map((t) => t.id) || []
+  );
+  await supabase.from("threads").delete().eq("client_id", clientId);
+  console.log("  Cleaned old briefs and threads");
+
   console.log("  Generating 500 claims...");
-  const claims = generateClaims(500);
+  const claims = generateClaims(500, clientId, adjusterIds);
 
   console.log("  Inserting claims...");
   const batchSize = 50;
@@ -242,14 +241,15 @@ export async function runSeed(): Promise<void> {
   const { data: insertedClaims } = await supabase
     .from("claims")
     .select("id, claim_number")
-    .eq("client_id", CLIENT_ID);
+    .eq("client_id", clientId);
 
   if (!insertedClaims?.length) {
-    console.error("No claims found!");
+    console.error("No claims found after insert!");
     return;
   }
 
   const claimMap = new Map(insertedClaims.map((c) => [c.claim_number, c.id]));
+  console.log(`  Mapped ${claimMap.size} claims`);
 
   console.log("  Inserting stage history...");
   const stageHistory = generateStageHistory(claims);
@@ -271,7 +271,7 @@ export async function runSeed(): Promise<void> {
   }
 
   console.log("  Inserting reviews...");
-  const reviews = generateReviews(claims);
+  const reviews = generateReviews(claims, adjusterIds);
   for (let i = 0; i < reviews.length; i += batchSize) {
     const batch = reviews.slice(i, i + batchSize).map((r) => ({
       claim_id: claimMap.get(r.claim_number),
@@ -309,4 +309,9 @@ export async function runSeed(): Promise<void> {
   }
 
   console.log("\nSeeding complete!");
+  console.log(`  Client: ${clientName}`);
+  console.log(`  Claims: ${claims.length}`);
+  console.log(`  Stage history: ${stageHistory.length} records`);
+  console.log(`  Reviews: ${reviews.length} records`);
+  console.log(`  LLM usage: ${llmUsage.length} records`);
 }

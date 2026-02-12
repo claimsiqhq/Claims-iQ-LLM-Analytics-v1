@@ -71,6 +71,7 @@ export async function registerRoutes(
       log("Starting database seed...", "seed");
       await runSeed();
       invalidateDefaultsCache();
+      await queryCache.cleanAllCache();
       res.json({ status: "ok", message: "Database seeded successfully" });
     } catch (err: any) {
       log(`Seed error: ${err.message}`, "seed");
