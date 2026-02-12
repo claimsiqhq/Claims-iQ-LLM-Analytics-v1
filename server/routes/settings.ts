@@ -5,6 +5,7 @@ import fs from "fs";
 import { createRequire } from "module";
 import { getSupabaseClient, supabase } from "../config/supabase";
 import { getDefaultClientId } from "../config/defaults";
+import { ensureDefaultUser } from "../seedUser";
 
 const _require = typeof require !== "undefined" ? require : createRequire(import.meta.url);
 const XLSX = _require("xlsx");
@@ -89,6 +90,8 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
     }
 
     const clientId = (req.body.client_id as string) || (req.query.client_id as string) || await getDefaultClientId();
+
+    await ensureDefaultUser();
 
     const sb = getSupabaseClient();
     const wb = XLSX.readFile(file.path);
