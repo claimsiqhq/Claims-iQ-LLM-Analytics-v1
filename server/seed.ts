@@ -244,6 +244,50 @@ function fillMissingDates(claims: any[]): void {
   console.log(`  Filled dates for ${claims.filter(c => c.fnol_date).length}/${claims.length} claims (all should have date_of_loss and fnol_date now)`);
 }
 
+function shiftDatesIntoLastNDays(claims: any[], days: number): void {
+  const dateFields = ["date_of_loss", "fnol_date", "assigned_at", "first_touch_at", "closed_at"];
+
+  const allTimestamps: number[] = [];
+  for (const c of claims) {
+    for (const f of dateFields) {
+      if (c[f]) {
+        const t = new Date(c[f]).getTime();
+        if (!isNaN(t)) allTimestamps.push(t);
+      }
+    }
+  }
+  if (allTimestamps.length === 0) return;
+
+  const minTs = Math.min(...allTimestamps);
+  const maxTs = Math.max(...allTimestamps);
+  const originalSpan = maxTs - minTs;
+
+  const now = Date.now();
+  const targetEnd = now - 1 * 86400000;
+  const targetSpan = Math.min(days * 86400000, Math.max(originalSpan, 30 * 86400000));
+  const targetStart = targetEnd - targetSpan;
+
+  const scale = originalSpan > 0 ? targetSpan / originalSpan : 1;
+
+  for (const c of claims) {
+    for (const f of dateFields) {
+      if (!c[f]) continue;
+      const t = new Date(c[f]).getTime();
+      if (isNaN(t)) continue;
+      const shifted = targetStart + (t - minTs) * scale;
+      const clamped = Math.min(shifted, now);
+      const d = new Date(clamped);
+      if (f === "date_of_loss") {
+        c[f] = d.toISOString().split("T")[0];
+      } else {
+        c[f] = d.toISOString().split("T")[0];
+      }
+    }
+  }
+
+  console.log(`  Date range shifted: ${new Date(targetStart).toISOString().split("T")[0]} → ${new Date(targetEnd).toISOString().split("T")[0]} (${days} day window)`);
+}
+
 function parseDate(val: any): string | null {
   if (!val) return null;
   if (typeof val === "number") {
@@ -319,6 +363,9 @@ async function seedClient(supabase: any, clientId: string, clientName: string, d
 
   console.log(`  Filling missing dates for claims...`);
   fillMissingDates(data.claims);
+
+  console.log(`  Shifting all dates into the last 90 days...`);
+  shiftDatesIntoLastNDays(data.claims, 90);
 
   console.log(`  Inserting ${data.claims.length} claims from spreadsheet...`);
   const claimRows = data.claims.map((c) => ({

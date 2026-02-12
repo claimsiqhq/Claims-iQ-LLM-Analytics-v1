@@ -34,6 +34,39 @@ const SEVERITY_MAP: Record<string, string> = {
 
 const STAGES = ["fnol", "investigation", "evaluation", "negotiation", "settlement", "closed"];
 
+function shiftDatesIntoLastNDays(rows: any[], days: number): void {
+  const dateFields = ["date_of_loss", "fnol_date", "assigned_at", "first_touch_at", "closed_at"];
+  const allTimestamps: number[] = [];
+  for (const r of rows) {
+    for (const f of dateFields) {
+      if (r[f]) {
+        const t = new Date(r[f]).getTime();
+        if (!isNaN(t)) allTimestamps.push(t);
+      }
+    }
+  }
+  if (allTimestamps.length === 0) return;
+
+  const minTs = Math.min(...allTimestamps);
+  const maxTs = Math.max(...allTimestamps);
+  const originalSpan = maxTs - minTs;
+  const now = Date.now();
+  const targetEnd = now - 86400000;
+  const targetSpan = Math.min(days * 86400000, Math.max(originalSpan, 30 * 86400000));
+  const targetStart = targetEnd - targetSpan;
+  const scale = originalSpan > 0 ? targetSpan / originalSpan : 1;
+
+  for (const r of rows) {
+    for (const f of dateFields) {
+      if (!r[f]) continue;
+      const t = new Date(r[f]).getTime();
+      if (isNaN(t)) continue;
+      const shifted = targetStart + (t - minTs) * scale;
+      r[f] = new Date(Math.min(shifted, now)).toISOString();
+    }
+  }
+}
+
 settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), async (req: Request, res: Response) => {
   const file = (req as any).file;
   try {
@@ -89,6 +122,8 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       }
       result.imported.adjusters = Object.keys(adjusterIdMap).length;
     }
+
+    shiftDatesIntoLastNDays(claimsSheet, 90);
 
     if (claimsSheet.length > 0) {
       const now = new Date();
