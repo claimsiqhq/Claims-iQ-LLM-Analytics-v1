@@ -439,3 +439,22 @@ ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_silence_duration I
 -- 18. Expand dimensions for queue_depth and claims_in_progress
 UPDATE metric_definitions SET allowed_dimensions = ARRAY['priority','carrier','adjuster','region','peril','severity'] WHERE slug = 'queue_depth';
 UPDATE metric_definitions SET allowed_dimensions = ARRAY['stage','adjuster','peril','region','severity'] WHERE slug = 'claims_in_progress';
+
+-- 19. exec_stmt function for running DDL/DML from the migration runner
+CREATE OR REPLACE FUNCTION exec_stmt(stmt TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  EXECUTE stmt;
+  RETURN 'OK';
+END;
+$$;
+
+-- 20. Schema migrations tracking table
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id SERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  applied_at TIMESTAMPTZ DEFAULT now()
+);

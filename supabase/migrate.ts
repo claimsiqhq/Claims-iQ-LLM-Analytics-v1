@@ -24,47 +24,34 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 const MIGRATION_TABLE = "schema_migrations";
 
-async function execViaRest(sql: string): Promise<any> {
-  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/execute_raw_sql`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: supabaseServiceKey,
-      Authorization: `Bearer ${supabaseServiceKey}`,
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({ query_text: sql }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    if (
-      body.includes("query has no destination") ||
-      body.includes("query does not return")
-    ) {
-      return null;
-    }
-    throw new Error(`SQL error (${res.status}): ${body}`);
-  }
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
+async function execSQL(sql: string): Promise<any> {
+  const { data, error } = await supabase.rpc("execute_raw_sql", { query_text: sql });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 async function ensureMigrationTable() {
-  const checkResult = await execViaRest(
+  const result = await execSQL(
     `SELECT to_regclass('public.${MIGRATION_TABLE}') AS tbl`
   );
-  const exists = checkResult && checkResult.length > 0 && checkResult[0].tbl;
+  const exists = result && result.length > 0 && result[0].tbl;
   if (!exists) {
-    await execViaRest(`
-      CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (
-        id SERIAL PRIMARY KEY,
-        name TEXT UNIQUE NOT NULL,
-        applied_at TIMESTAMPTZ DEFAULT now()
-      )
-    `);
+    const createSQL = `CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, applied_at TIMESTAMPTZ DEFAULT now())`;
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/execute_raw_sql`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseServiceKey,
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ query_text: createSQL }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      if (!body.includes("already exists")) {
+        throw new Error(`Failed to create migration table: ${body}`);
+      }
+    }
     console.log("  Created schema_migrations table");
   }
 }
@@ -103,7 +90,7 @@ async function runMigrationFile(filePath: string): Promise<void> {
 
   for (const stmt of statements) {
     if (!stmt) continue;
-    await execViaRest(stmt);
+    await execSQL(stmt);
   }
 }
 
