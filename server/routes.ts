@@ -125,18 +125,28 @@ export async function registerRoutes(
       const metrics = await getMetrics();
       const preferences = await getClientPreferences(resolvedClientId).catch(() => null);
 
-      let threadId = thread_id;
+      let threadId: string | null = thread_id || null;
       let context: ThreadContext = createEmptyContext();
       let turnIndex = 0;
 
       if (threadId) {
-        const turns = await storage.getThreadTurns(threadId);
-        turnIndex = turns.length;
-        const lastTurn = turns[turns.length - 1];
-        if (lastTurn?.context_stack) {
-          context = lastTurn.context_stack as ThreadContext;
+        try {
+          const existingThread = await storage.getThread(threadId);
+          if (existingThread) {
+            const turns = await storage.getThreadTurns(threadId);
+            turnIndex = turns.length;
+            const lastTurn = turns[turns.length - 1];
+            if (lastTurn?.context_stack) {
+              context = lastTurn.context_stack as ThreadContext;
+            }
+          } else {
+            threadId = null;
+          }
+        } catch {
+          threadId = null;
         }
-      } else {
+      }
+      if (!threadId) {
         const session = await storage.getOrCreateSession(userId, resolvedClientId);
         const thread = await storage.createThread(
           session.id,
@@ -323,7 +333,7 @@ export async function registerRoutes(
         query_latency_ms: queryMs,
       });
 
-      await storage.updateThread(threadId, { title: message.slice(0, 80) });
+      await storage.updateThread(threadId!, { title: message.slice(0, 80) });
 
       res.json({
         thread_id: threadId,
