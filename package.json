@@ -59,6 +59,7 @@
     "html2canvas": "^1.4.1",
     "iconoir-react": "^7.11.0",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.1.0",
     "lucide-react": "^0.545.0",
     "memorystore": "^1.6.7",
     "multer": "^2.0.2",

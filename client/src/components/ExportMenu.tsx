@@ -1,6 +1,6 @@
 import React from "react";
 import { Download, Copy } from "iconoir-react";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
