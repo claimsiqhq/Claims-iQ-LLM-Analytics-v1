@@ -10,7 +10,6 @@ import { sharesRouter } from "./routes/shares";
 import { annotationsRouter } from "./routes/annotations";
 import { scheduledReportsRouter } from "./routes/scheduled-reports";
 import { dashboardsRouter } from "./routes/dashboards";
-import { importRouter } from "./routes/import";
 import { apiKeysRouter } from "./routes/api-keys";
 import { voiceRouter } from "./routes/voice";
 import { settingsRouter } from "./routes/settings";
@@ -55,7 +54,6 @@ export async function registerRoutes(
   app.use(scheduledReportsRouter);
   app.use(dashboardsRouter);
   app.use(apiKeysRouter);
-  app.use(importRouter);
   app.use(voiceRouter);
   app.use(settingsRouter);
 

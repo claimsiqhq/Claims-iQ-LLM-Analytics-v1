@@ -224,10 +224,13 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       result.imported.adjusters = adjustersInserted;
     }
 
+    const ALLOWED_STATUSES = ["open", "in_progress", "review"];
     const STATUS_REMAP: Record<string, string> = {
       denied: "open",
       closed: "open",
       closed_no_payment: "open",
+      reopened: "open",
+      rejected: "open",
     };
     const STAGE_REMAP: Record<string, string> = {
       closed: "under_review",
@@ -241,7 +244,9 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       const rawStatus = (row.status || "open").toLowerCase();
       if (STATUS_REMAP[rawStatus]) {
         row.status = STATUS_REMAP[rawStatus];
-        // Keep closed_at for "Closed This Week" KPI reporting; only remap status
+        statusRemapped++;
+      } else if (!ALLOWED_STATUSES.includes(rawStatus)) {
+        row.status = "open";
         statusRemapped++;
       }
       const rawStage = (row.current_stage || "").toLowerCase();

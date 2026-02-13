@@ -59,9 +59,6 @@ const STAGE_ORDER = [
   "approved",
   "payment_pending",
   "payment_issued",
-  "closed_settled",
-  "closed_denied",
-  "reopened",
 ];
 const MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20250929", "gpt-4o"];
 
@@ -185,12 +182,13 @@ const SEVERITY_MAP: Record<string, string> = {
 
 const STATUS_MAP: Record<string, string> = {
   open: "open",
-  closed: "closed",
-  closed_no_payment: "closed",
-  denied: "closed",
+  closed: "open",
+  closed_no_payment: "open",
+  denied: "open",
   in_progress: "in_progress",
   review: "review",
-  reopened: "reopened",
+  reopened: "open",
+  rejected: "open",
 };
 
 function mapSeverity(val: string | undefined): string {
