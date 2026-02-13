@@ -41,9 +41,14 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
   const streamRef = useRef<MediaStream | null>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
 
-  const pendingFunctionCalls = useRef<Map<string, { name: string; arguments: string }>>(new Map());
+  const pendingFunctionCalls = useRef<Map<string, { name: string; arguments: string; callId: string }>>(new Map());
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiTranscriptRef = useRef("");
+  const voiceThreadIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    voiceThreadIdRef.current = activeThreadId || null;
+  }, [activeThreadId]);
 
   useEffect(() => {
     if (muted && streamRef.current) {
@@ -112,16 +117,18 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: question,
-          thread_id: activeThreadId || null,
+          thread_id: voiceThreadIdRef.current,
           client_id: clientId,
         }),
       });
 
       const data: ChartResponse = await res.json();
 
-      if (data.chart) {
-        onNewResponse(data);
+      if (data.thread_id) {
+        voiceThreadIdRef.current = data.thread_id;
       }
+
+      onNewResponse(data);
 
       const summaryForVoice = data.insight || data.error?.message || "I found the data but couldn't generate a summary.";
 
@@ -151,7 +158,36 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
       dcRef.current?.send(JSON.stringify({ type: "response.create" }));
       setHistory((h) => [...h, { role: "user", text: question }, { role: "assistant", text: "Sorry, I couldn't fetch that data." }]);
     }
-  }, [clientId, onNewResponse, activeThreadId]);
+  }, [clientId, onNewResponse]);
+
+  const handleQuickPrompt = useCallback(async (question: string) => {
+    try {
+      setHistory((h) => [...h, { role: "user", text: question }]);
+
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: question,
+          thread_id: voiceThreadIdRef.current,
+          client_id: clientId,
+        }),
+      });
+
+      const data: ChartResponse = await res.json();
+
+      if (data.thread_id) {
+        voiceThreadIdRef.current = data.thread_id;
+      }
+
+      onNewResponse(data);
+
+      const summaryForVoice = data.insight || data.error?.message || "Here are the results.";
+      setHistory((h) => [...h, { role: "assistant", text: summaryForVoice }]);
+    } catch (err: any) {
+      setHistory((h) => [...h, { role: "assistant", text: "Sorry, I couldn't fetch that data." }]);
+    }
+  }, [clientId, onNewResponse]);
 
   const connect = useCallback(async () => {
     try {
@@ -277,8 +313,9 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
               break;
 
             case "response.function_call_arguments.delta": {
-              const existing = pendingFunctionCalls.current.get(msg.item_id) || { name: "", arguments: "" };
+              const existing = pendingFunctionCalls.current.get(msg.item_id) || { name: "", arguments: "", callId: "" };
               existing.arguments += msg.delta || "";
+              if (msg.call_id) existing.callId = msg.call_id;
               pendingFunctionCalls.current.set(msg.item_id, existing);
               break;
             }
@@ -288,6 +325,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
                 pendingFunctionCalls.current.set(msg.item.id, {
                   name: msg.item.name || "",
                   arguments: "",
+                  callId: msg.item.call_id || "",
                 });
               }
               break;
@@ -295,12 +333,11 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
 
             case "response.function_call_arguments.done": {
               const fc = pendingFunctionCalls.current.get(msg.item_id);
-              if (fc) {
-                handleFunctionCall(msg.item_id, fc.name || msg.name, fc.arguments || msg.arguments);
-                pendingFunctionCalls.current.delete(msg.item_id);
-              } else {
-                handleFunctionCall(msg.item_id, msg.name, msg.arguments);
-              }
+              const resolvedCallId = msg.call_id || fc?.callId || msg.item_id;
+              const resolvedName = fc?.name || msg.name;
+              const resolvedArgs = fc?.arguments || msg.arguments;
+              pendingFunctionCalls.current.delete(msg.item_id);
+              handleFunctionCall(resolvedCallId, resolvedName, resolvedArgs);
               break;
             }
 
@@ -494,7 +531,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ clientId, onNewResponse,
             {QUICK_PROMPTS.map((q, i) => (
               <button
                 key={i}
-                onClick={() => handleFunctionCall(`quick-${i}`, "ask_claims_question", JSON.stringify({ question: q }))}
+                onClick={() => handleQuickPrompt(q)}
                 className="min-h-[44px] px-3 py-2 bg-surface-purple-light dark:bg-gray-700 hover:bg-brand-purple/20 dark:hover:bg-gray-600 rounded-lg text-xs text-brand-deep-purple dark:text-gray-200 transition-colors touch-manipulation"
               >
                 {q}
