@@ -332,6 +332,8 @@ CREATE TABLE IF NOT EXISTS thread_annotations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_thread_shares_thread ON thread_shares(thread_id);
+-- Add share_token if thread_shares existed with older schema (column was missing)
+ALTER TABLE thread_shares ADD COLUMN IF NOT EXISTS share_token TEXT;
 CREATE INDEX IF NOT EXISTS idx_thread_shares_token ON thread_shares(share_token);
 CREATE INDEX IF NOT EXISTS idx_thread_annotations_thread ON thread_annotations(thread_id);
 
