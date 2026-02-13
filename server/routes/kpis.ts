@@ -19,10 +19,10 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
       (req.query.client_id as string) || await getDefaultClientId();
     const startDate = req.query.start_date as string | undefined;
     const endDate = req.query.end_date as string | undefined;
+    const periodLabel = (req.query.period_label as string) || "Period";
 
     const safeClientId = clientId.replace(/'/g, "''");
     const today = new Date().toISOString().split("T")[0];
-    const todayEnd = today + "T23:59:59";
 
     let periodStart: string;
     let periodEnd: string;
@@ -44,14 +44,15 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
     const [
       queueRes, queuePrevRes,
       slaRes, slaPrevRes,
-      claimsWeekRes, claimsPrevWeekRes,
-      closedWeekRes, closedPrevWeekRes,
+      claimsRes, claimsPrevRes,
+      closedRes, closedPrevRes,
     ] = await Promise.all([
       supabase.rpc("execute_raw_sql", {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
             AND c.status NOT IN ('closed', 'denied')
+            AND c.fnol_date <= '${periodEnd}T23:59:59'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -59,7 +60,7 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
             AND c.status NOT IN ('closed', 'denied')
-            AND c.fnol_date < '${periodStart}'
+            AND c.fnol_date <= '${prevPeriodEnd}T23:59:59'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -67,7 +68,8 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           SELECT ROUND(AVG(CASE WHEN c.sla_breached THEN 1.0 ELSE 0.0 END)::numeric, 4) as value
           FROM claims c
           WHERE c.client_id = '${safeClientId}'
-            AND c.fnol_date >= NOW() - INTERVAL '30 days'
+            AND c.fnol_date >= '${periodStart}'
+            AND c.fnol_date <= '${periodEnd}T23:59:59'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -75,8 +77,8 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           SELECT ROUND(AVG(CASE WHEN c.sla_breached THEN 1.0 ELSE 0.0 END)::numeric, 4) as value
           FROM claims c
           WHERE c.client_id = '${safeClientId}'
-            AND c.fnol_date >= NOW() - INTERVAL '60 days'
-            AND c.fnol_date < NOW() - INTERVAL '30 days'
+            AND c.fnol_date >= '${prevPeriodStart}'
+            AND c.fnol_date < '${prevPeriodEnd}'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -117,17 +119,17 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
 
     const queueDepth = (queueRes.data as any)?.[0]?.value ?? 0;
     const queuePrev = (queuePrevRes.data as any)?.[0]?.value ?? 0;
-    const slaBreachRate = (slaRes.data as any)?.[0]?.value ?? 0;
-    const slaPrev = (slaPrevRes.data as any)?.[0]?.value ?? 0;
-    const claimsThisWeek = (claimsWeekRes.data as any)?.[0]?.value ?? 0;
-    const claimsPrevWeek = (claimsPrevWeekRes.data as any)?.[0]?.value ?? 0;
-    const closedThisWeek = (closedWeekRes.data as any)?.[0]?.value ?? 0;
-    const closedPrevWeek = (closedPrevWeekRes.data as any)?.[0]?.value ?? 0;
+    const slaBreachRate = Number((slaRes.data as any)?.[0]?.value ?? 0);
+    const slaPrev = Number((slaPrevRes.data as any)?.[0]?.value ?? 0);
+    const claimsCurrent = (claimsRes.data as any)?.[0]?.value ?? 0;
+    const claimsPrev = (claimsPrevRes.data as any)?.[0]?.value ?? 0;
+    const closedCurrent = (closedRes.data as any)?.[0]?.value ?? 0;
+    const closedPrev = (closedPrevRes.data as any)?.[0]?.value ?? 0;
 
     const queueTrend = computeTrend(Number(queueDepth), Number(queuePrev));
-    const slaTrend = computeTrend(Number(slaBreachRate), Number(slaPrev));
-    const claimsTrend = computeTrend(Number(claimsThisWeek), Number(claimsPrevWeek));
-    const closedTrend = computeTrend(Number(closedThisWeek), Number(closedPrevWeek));
+    const slaTrend = computeTrend(slaBreachRate, slaPrev);
+    const claimsTrend = computeTrend(Number(claimsCurrent), Number(claimsPrev));
+    const closedTrend = computeTrend(Number(closedCurrent), Number(closedPrev));
 
     res.json({
       success: true,
@@ -141,15 +143,15 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           delta: slaTrend.delta,
         },
         {
-          label: "Claims This Week",
-          value: claimsThisWeek,
+          label: `Claims ${periodLabel}`,
+          value: claimsCurrent,
           unit: "claims",
           trend: claimsTrend.trend,
           delta: claimsTrend.delta,
         },
         {
-          label: "Closed This Week",
-          value: closedThisWeek,
+          label: `Closed ${periodLabel}`,
+          value: closedCurrent,
           unit: "claims",
           trend: closedTrend.trend,
           delta: closedTrend.delta,

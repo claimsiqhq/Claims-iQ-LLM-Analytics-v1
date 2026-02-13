@@ -11,13 +11,6 @@ interface KPIMetric {
   delta?: number;
 }
 
-const DRILL_DOWN_QUESTIONS: Record<string, string> = {
-  "Queue Depth": "Queue depth by region",
-  "SLA Breach Rate": "SLA breach rate by adjuster",
-  "Claims This Week": "Claims received this week by region",
-  "Closed This Week": "Claims closed this week by adjuster",
-};
-
 interface KPICardsProps {
   clientId: string;
   onDrillDown?: (question: string) => void;
@@ -25,20 +18,21 @@ interface KPICardsProps {
 
 function getTrendColor(label: string, trend: "up" | "down" | "neutral"): string {
   if (trend === "neutral") return "text-text-secondary";
-  if (label === "Claims This Week") return "text-text-secondary";
+  if (label.startsWith("Claims")) return "text-text-secondary";
   if (label === "Queue Depth" || label === "SLA Breach Rate") {
     return trend === "up" ? "text-red-500" : "text-green-600";
   }
-  if (label === "Closed This Week") {
+  if (label.startsWith("Closed")) {
     return trend === "up" ? "text-green-600" : "text-red-500";
   }
   return "text-text-secondary";
 }
 
-const DATE_PRESETS: { value: string; label: string; getRange: () => { start: string; end: string } }[] = [
+const DATE_PRESETS: { value: string; label: string; periodLabel: string; getRange: () => { start: string; end: string } }[] = [
   {
     value: "week",
     label: "This week vs last week",
+    periodLabel: "This Week",
     getRange: () => {
       const now = new Date();
       const end = new Date(now);
@@ -50,17 +44,18 @@ const DATE_PRESETS: { value: string; label: string; getRange: () => { start: str
   {
     value: "month",
     label: "This month vs last month",
+    periodLabel: "This Month",
     getRange: () => {
       const now = new Date();
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const start = new Date(end);
-      start.setMonth(start.getMonth() - 1);
+      const start = new Date(end.getFullYear(), end.getMonth(), 1);
       return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
     },
   },
   {
     value: "7d",
     label: "Last 7 days",
+    periodLabel: "Last 7 Days",
     getRange: () => {
       const end = new Date();
       const start = new Date();
@@ -71,6 +66,7 @@ const DATE_PRESETS: { value: string; label: string; getRange: () => { start: str
   {
     value: "30d",
     label: "Last 30 days",
+    periodLabel: "Last 30 Days",
     getRange: () => {
       const end = new Date();
       const start = new Date();
@@ -85,16 +81,19 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId, onDrillDown }) => 
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState("week");
 
-  const dateRange = useMemo(() => {
-    const preset = DATE_PRESETS.find((p) => p.value === datePreset);
-    return preset?.getRange() ?? DATE_PRESETS[0].getRange();
-  }, [datePreset]);
+  const preset = useMemo(() => DATE_PRESETS.find((p) => p.value === datePreset) ?? DATE_PRESETS[0], [datePreset]);
+  const dateRange = useMemo(() => preset.getRange(), [preset]);
 
   useEffect(() => {
     const fetchKpis = async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams({ client_id: clientId, start_date: dateRange.start, end_date: dateRange.end });
+        const params = new URLSearchParams({
+          client_id: clientId,
+          start_date: dateRange.start,
+          end_date: dateRange.end,
+          period_label: preset.periodLabel,
+        });
         const res = await fetch(`/api/kpis?${params}`);
         const json = await res.json();
         if (json.data) setKpis(json.data);
@@ -107,7 +106,15 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId, onDrillDown }) => 
     fetchKpis();
     const interval = setInterval(fetchKpis, 60000);
     return () => clearInterval(interval);
-  }, [clientId, dateRange.start, dateRange.end]);
+  }, [clientId, dateRange.start, dateRange.end, preset.periodLabel]);
+
+  const getDrillDownQuestion = (label: string): string => {
+    if (label === "Queue Depth") return "Queue depth by region";
+    if (label === "SLA Breach Rate") return "SLA breach rate by adjuster";
+    if (label.startsWith("Claims")) return `Claims received ${preset.periodLabel.toLowerCase()} by region`;
+    if (label.startsWith("Closed")) return `Claims closed ${preset.periodLabel.toLowerCase()} by adjuster`;
+    return label;
+  };
 
   if (loading || kpis.length === 0) return null;
 
@@ -132,10 +139,10 @@ export const KPICards: React.FC<KPICardsProps> = ({ clientId, onDrillDown }) => 
           key={idx}
           className={`px-2.5 md:px-3 py-2 md:py-2.5 min-w-[100px] md:min-w-[120px] border border-surface-grey-lavender dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm dark:shadow-gray-900/30 shrink-0 ${onDrillDown ? "cursor-pointer hover:ring-2 hover:ring-brand-purple/30 transition-all" : ""}`}
           data-testid={`kpi-card-${kpi.label.toLowerCase().replace(/\s+/g, "-")}`}
-          onClick={() => onDrillDown?.(DRILL_DOWN_QUESTIONS[kpi.label] || kpi.label)}
+          onClick={() => onDrillDown?.(getDrillDownQuestion(kpi.label))}
           role={onDrillDown ? "button" : undefined}
           tabIndex={onDrillDown ? 0 : undefined}
-          onKeyDown={onDrillDown ? (e) => e.key === "Enter" && onDrillDown(DRILL_DOWN_QUESTIONS[kpi.label] || kpi.label) : undefined}
+          onKeyDown={onDrillDown ? (e) => e.key === "Enter" && onDrillDown(getDrillDownQuestion(kpi.label)) : undefined}
         >
           <p className="text-[10px] md:text-xs text-text-secondary dark:text-gray-400 font-medium leading-tight truncate">{kpi.label}</p>
           <p className="text-base md:text-lg font-bold text-brand-deep-purple dark:text-gray-100 font-mono mt-0.5">
