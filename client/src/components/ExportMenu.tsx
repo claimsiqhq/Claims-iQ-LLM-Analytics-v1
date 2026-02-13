@@ -67,6 +67,38 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
     }
   };
 
+  const handleExportPDF = async (e: Event) => {
+    e.preventDefault();
+    if (!chartContainerRef?.current) {
+      toast({ title: "Chart not ready for export", variant: "destructive" });
+      return;
+    }
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { jsPDF } = await import("jspdf");
+      const canvas = await html2canvas(chartContainerRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const ratio = Math.min(pageW / imgW, pageH / imgH) * 0.95;
+      const w = imgW * ratio;
+      const h = imgH * ratio;
+      pdf.addImage(imgData, "PNG", (pageW - w) / 2, (pageH - h) / 2, w, h);
+      pdf.save(`${chartTitle.replace(/\s+/g, "_")}.pdf`);
+      toast({ title: "PDF exported successfully" });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast({ title: "Failed to export PDF", variant: "destructive" });
+    }
+  };
+
   const handleExportCSV = (e: Event) => {
     e.preventDefault();
     try {
@@ -169,6 +201,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
         <DropdownMenuItem onSelect={handleExportPNG} className="cursor-pointer flex items-center gap-2" data-testid="button-export-png">
           <ImageIcon width={16} height={16} />
           Export as PNG
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={handleExportPDF} className="cursor-pointer flex items-center gap-2" data-testid="button-export-pdf">
+          <FileText width={16} height={16} />
+          Export as PDF
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={handleExportCSV} className="cursor-pointer" data-testid="button-export-csv">
           Export as CSV

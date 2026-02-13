@@ -17,12 +17,29 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
   try {
     const clientId =
       (req.query.client_id as string) || await getDefaultClientId();
+    const startDate = req.query.start_date as string | undefined;
+    const endDate = req.query.end_date as string | undefined;
 
     const safeClientId = clientId.replace(/'/g, "''");
     const today = new Date().toISOString().split("T")[0];
     const todayEnd = today + "T23:59:59";
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    let periodStart: string;
+    let periodEnd: string;
+    let prevPeriodStart: string;
+    let prevPeriodEnd: string;
+    if (startDate && endDate) {
+      periodStart = startDate;
+      periodEnd = endDate;
+      const periodMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+      prevPeriodEnd = startDate;
+      prevPeriodStart = new Date(new Date(startDate).getTime() - periodMs).toISOString().split("T")[0];
+    } else {
+      periodStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      periodEnd = today;
+      prevPeriodStart = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      prevPeriodEnd = periodStart;
+    }
 
     const [
       queueRes, queuePrevRes,
@@ -42,7 +59,7 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
             AND c.status NOT IN ('closed', 'denied')
-            AND c.fnol_date < '${weekAgo}'
+            AND c.fnol_date < '${periodStart}'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -66,25 +83,16 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
-            AND c.fnol_date >= '${weekAgo}'
-            AND c.fnol_date <= '${todayEnd}'
+            AND c.fnol_date >= '${periodStart}'
+            AND c.fnol_date <= '${periodEnd}T23:59:59'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
         query_text: `
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
-            AND c.fnol_date >= '${twoWeeksAgo}'
-            AND c.fnol_date < '${weekAgo}'
-        `,
-      }),
-      supabase.rpc("execute_raw_sql", {
-        query_text: `
-          SELECT COUNT(*)::int as value FROM claims c
-          WHERE c.client_id = '${safeClientId}'
-            AND c.closed_at IS NOT NULL
-            AND c.closed_at >= '${weekAgo}T00:00:00'
-            AND c.closed_at <= '${todayEnd}T23:59:59'
+            AND c.fnol_date >= '${prevPeriodStart}'
+            AND c.fnol_date < '${prevPeriodEnd}'
         `,
       }),
       supabase.rpc("execute_raw_sql", {
@@ -92,8 +100,17 @@ kpisRouter.get("/api/kpis", async (req: Request, res: Response) => {
           SELECT COUNT(*)::int as value FROM claims c
           WHERE c.client_id = '${safeClientId}'
             AND c.closed_at IS NOT NULL
-            AND c.closed_at >= '${twoWeeksAgo}T00:00:00'
-            AND c.closed_at < '${weekAgo}T00:00:00'
+            AND c.closed_at >= '${periodStart}T00:00:00'
+            AND c.closed_at <= '${periodEnd}T23:59:59'
+        `,
+      }),
+      supabase.rpc("execute_raw_sql", {
+        query_text: `
+          SELECT COUNT(*)::int as value FROM claims c
+          WHERE c.client_id = '${safeClientId}'
+            AND c.closed_at IS NOT NULL
+            AND c.closed_at >= '${prevPeriodStart}T00:00:00'
+            AND c.closed_at < '${prevPeriodEnd}T00:00:00'
         `,
       }),
     ]);

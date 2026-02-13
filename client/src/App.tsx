@@ -228,7 +228,13 @@ function App() {
               className="px-4 pb-4 md:px-6 md:pb-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto"
               style={{ paddingTop: "6rem", ...(!isMobile ? { marginLeft: `${chatWidth}px` } : {}) }}
             >
-              <KPICards clientId={selectedClientId} />
+              <KPICards
+                clientId={selectedClientId}
+                onDrillDown={(q) => {
+                  setQuestionToSubmit(q);
+                  if (isMobile) setMobileChatOpen(true);
+                }}
+              />
               <MorningBrief clientId={selectedClientId} />
               <div ref={chartContainerRef} data-tour="canvas-area">
                 <Canvas
