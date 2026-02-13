@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,62 +6,41 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let supabaseUrl = (process.env.SUPABASE_URL || "").trim();
-const mdMatch = supabaseUrl.match(/\[([^\]]+)\]/);
-if (mdMatch) supabaseUrl = mdMatch[1];
-supabaseUrl = supabaseUrl.replace(/\/+$/, "");
-const supabaseServiceKey = (process.env.SUPABASE_SERVICE_KEY || "").trim();
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY");
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false },
-});
+const DATABASE_URL =
+  process.env.SUPABASE_DB_URL ||
+  "postgresql://postgres.lfrhuxzxlzlztghgnqzg:zyBMeDbkUKV2CkWB@aws-1-eu-north-1.pooler.supabase.com:5432/postgres";
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
-const MIGRATION_TABLE = "schema_migrations";
 
-async function execSQL(sql: string): Promise<any> {
-  const { data, error } = await supabase.rpc("execute_raw_sql", { query_text: sql });
-  if (error) throw new Error(error.message);
-  return data;
-}
-
-async function ensureMigrationTable() {
-  const result = await execSQL(
-    `SELECT to_regclass('public.${MIGRATION_TABLE}') AS tbl`
-  );
-  const exists = result && result.length > 0 && result[0].tbl;
-  if (!exists) {
-    const createSQL = `CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, applied_at TIMESTAMPTZ DEFAULT now())`;
-    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/execute_raw_sql`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: supabaseServiceKey,
-        Authorization: `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({ query_text: createSQL }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      if (!body.includes("already exists")) {
-        throw new Error(`Failed to create migration table: ${body}`);
-      }
-    }
-    console.log("  Created schema_migrations table");
+function runQuery(sql: string): string {
+  try {
+    return execSync(`psql "${DATABASE_URL}" -t -A -c ${JSON.stringify(sql)}`, {
+      encoding: "utf-8",
+      timeout: 30000,
+    }).trim();
+  } catch (e: any) {
+    throw new Error(e.stderr || e.message);
   }
 }
 
-async function getAppliedMigrations(): Promise<string[]> {
-  const { data } = await supabase
-    .from(MIGRATION_TABLE)
-    .select("name")
-    .order("id", { ascending: true });
-  return (data || []).map((r: any) => r.name);
+function runFile(filePath: string): void {
+  execSync(`psql "${DATABASE_URL}" -f ${JSON.stringify(filePath)}`, {
+    encoding: "utf-8",
+    timeout: 30000,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+function ensureMigrationTable() {
+  runQuery("CREATE TABLE IF NOT EXISTS schema_migrations (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, applied_at TIMESTAMPTZ DEFAULT now())");
+}
+
+function getAppliedMigrations(): string[] {
+  const result = runQuery(
+    `SELECT name FROM schema_migrations ORDER BY id ASC`
+  );
+  if (!result) return [];
+  return result.split("\n").filter(Boolean);
 }
 
 function getMigrationFiles(direction: "up" | "down"): string[] {
@@ -72,31 +51,9 @@ function getMigrationFiles(direction: "up" | "down"): string[] {
     .sort();
 }
 
-async function runMigrationFile(filePath: string): Promise<void> {
-  const sql = fs.readFileSync(filePath, "utf-8");
-  const statements: string[] = [];
-  let current = "";
-
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("--") || trimmed === "") continue;
-    current += line + "\n";
-    if (trimmed.endsWith(";")) {
-      statements.push(current.trim().replace(/;\s*$/, ""));
-      current = "";
-    }
-  }
-  if (current.trim()) statements.push(current.trim().replace(/;\s*$/, ""));
-
-  for (const stmt of statements) {
-    if (!stmt) continue;
-    await execSQL(stmt);
-  }
-}
-
-async function migrateUp() {
-  await ensureMigrationTable();
-  const applied = await getAppliedMigrations();
+function migrateUp() {
+  ensureMigrationTable();
+  const applied = getAppliedMigrations();
   const files = getMigrationFiles("up");
 
   if (files.length === 0) {
@@ -112,8 +69,10 @@ async function migrateUp() {
       continue;
     }
     console.log(`  ▸ Applying ${name}...`);
-    await runMigrationFile(path.join(MIGRATIONS_DIR, file));
-    await supabase.from(MIGRATION_TABLE).insert({ name });
+    runFile(path.join(MIGRATIONS_DIR, file));
+    runQuery(
+      `INSERT INTO schema_migrations (name) VALUES ('${name}') ON CONFLICT DO NOTHING`
+    );
     console.log(`  ✓ ${name} applied`);
     ranCount++;
   }
@@ -125,9 +84,9 @@ async function migrateUp() {
   }
 }
 
-async function migrateDown() {
-  await ensureMigrationTable();
-  const applied = await getAppliedMigrations();
+function migrateDown() {
+  ensureMigrationTable();
+  const applied = getAppliedMigrations();
 
   if (applied.length === 0) {
     console.log("No migrations to revert.");
@@ -144,14 +103,14 @@ async function migrateDown() {
   }
 
   console.log(`  ▸ Reverting ${lastApplied}...`);
-  await runMigrationFile(downPath);
-  await supabase.from(MIGRATION_TABLE).delete().eq("name", lastApplied);
+  runFile(downPath);
+  runQuery(`DELETE FROM schema_migrations WHERE name = '${lastApplied}'`);
   console.log(`  ✓ ${lastApplied} reverted`);
 }
 
-async function migrateList() {
-  await ensureMigrationTable();
-  const applied = await getAppliedMigrations();
+function migrateList() {
+  ensureMigrationTable();
+  const applied = getAppliedMigrations();
   const files = getMigrationFiles("up");
 
   console.log("\nMigrations:");
@@ -172,25 +131,18 @@ async function migrateList() {
 
 const command = process.argv[2] || "list";
 
-(async () => {
-  try {
-    switch (command) {
-      case "up":
-        console.log("Running migrations up...\n");
-        await migrateUp();
-        break;
-      case "down":
-        console.log("Running migration down...\n");
-        await migrateDown();
-        break;
-      case "list":
-        await migrateList();
-        break;
-      default:
-        console.log("Usage: tsx supabase/migrate.ts [up|down|list]");
-    }
-  } catch (err: any) {
-    console.error("Migration failed:", err.message);
-    process.exit(1);
-  }
-})();
+switch (command) {
+  case "up":
+    console.log("Running migrations up...\n");
+    migrateUp();
+    break;
+  case "down":
+    console.log("Running migration down...\n");
+    migrateDown();
+    break;
+  case "list":
+    migrateList();
+    break;
+  default:
+    console.log("Usage: tsx supabase/migrate.ts [up|down|list]");
+}
