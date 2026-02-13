@@ -10,8 +10,9 @@ morningBriefRouter.get("/api/morning-brief", async (req: Request, res: Response)
     const clientId =
       (req.query.client_id as string) || await getDefaultClientId();
     const userId = await getDefaultUserId();
+    const forceRefresh = req.query.refresh === "true" || req.query.refresh === "1";
 
-    const brief = await morningBriefGenerator.generateMorningBrief(clientId, userId);
+    const brief = await morningBriefGenerator.generateMorningBrief(clientId, userId, { forceRefresh });
 
     res.json({
       success: true,

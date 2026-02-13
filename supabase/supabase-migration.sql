@@ -433,3 +433,7 @@ CREATE INDEX IF NOT EXISTS idx_client_preferences_client ON client_preferences(c
 ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_voice TEXT DEFAULT 'ash';
 ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_turn_sensitivity DECIMAL(3,2) DEFAULT 0.8;
 ALTER TABLE client_preferences ADD COLUMN IF NOT EXISTS voice_silence_duration INTEGER DEFAULT 800;
+
+-- 18. Expand dimensions for queue_depth and claims_in_progress
+UPDATE metric_definitions SET allowed_dimensions = ARRAY['priority','carrier','adjuster','region','peril','severity'] WHERE slug = 'queue_depth';
+UPDATE metric_definitions SET allowed_dimensions = ARRAY['stage','adjuster','peril','region','severity'] WHERE slug = 'claims_in_progress';

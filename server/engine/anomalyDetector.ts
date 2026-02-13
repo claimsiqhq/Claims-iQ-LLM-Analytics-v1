@@ -34,7 +34,7 @@ export class AnomalyDetector {
     const {
       metricSlugs,
       lookbackDays = 30,
-      threshold = 2.0,
+      threshold = 1.5,
     } = options;
 
     const anomalies: AnomalyEvent[] = [];
@@ -44,7 +44,7 @@ export class AnomalyDetector {
       const metricsToAnalyze = metricSlugs?.length
         ? metrics.filter((m) => metricSlugs.includes(m.slug))
         : metrics.filter((m) =>
-            ["claims_opened", "avg_cycle_time", "sla_breach_rate", "claims_closed", "avg_reserve_accuracy"].includes(m.slug)
+            ["claims_received", "cycle_time_e2e", "sla_breach_rate", "queue_depth", "claims_in_progress"].includes(m.slug)
           );
 
       if (metricsToAnalyze.length === 0) return [];

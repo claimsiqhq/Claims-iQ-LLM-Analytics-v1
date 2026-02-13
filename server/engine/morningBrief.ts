@@ -32,9 +32,18 @@ export interface MorningBrief {
 }
 
 export class MorningBriefGenerator {
-  async generateMorningBrief(clientId: string, userId: string): Promise<MorningBrief> {
+  async generateMorningBrief(clientId: string, userId: string, options?: { forceRefresh?: boolean }): Promise<MorningBrief> {
     try {
       const today = new Date().toISOString().split("T")[0];
+
+      if (options?.forceRefresh) {
+        await supabase
+          .from("morning_briefs")
+          .delete()
+          .eq("client_id", clientId)
+          .eq("user_id", userId)
+          .eq("brief_date", today);
+      }
 
       const { data: existingBrief } = await supabase
         .from("morning_briefs")
@@ -44,7 +53,7 @@ export class MorningBriefGenerator {
         .eq("brief_date", today)
         .single();
 
-      if (existingBrief) {
+      if (existingBrief && !options?.forceRefresh) {
         return {
           briefDate: existingBrief.brief_date,
           content: existingBrief.content,
@@ -136,7 +145,7 @@ export class MorningBriefGenerator {
 
     const topAnomalies = await anomalyDetector.detectAnomalies(clientId, {
       lookbackDays: 30,
-      threshold: 2.0,
+      threshold: 1.5,
     });
 
     const { data: slaRisks } = await supabase

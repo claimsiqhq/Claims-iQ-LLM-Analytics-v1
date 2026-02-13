@@ -241,7 +241,7 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       const rawStatus = (row.status || "open").toLowerCase();
       if (STATUS_REMAP[rawStatus]) {
         row.status = STATUS_REMAP[rawStatus];
-        row.closed_at = null;
+        // Keep closed_at for "Closed This Week" KPI reporting; only remap status
         statusRemapped++;
       }
       const rawStage = (row.current_stage || "").toLowerCase();
@@ -509,6 +509,11 @@ settingsRouter.post("/api/settings/import-spreadsheet", upload.single("file"), a
       };
       try { await sb.from("ingestion_jobs").insert(jobRecord); } catch {}
     }
+
+    // Invalidate morning brief cache so next fetch shows fresh data
+    try {
+      await sb.from("morning_briefs").delete().eq("client_id", clientId);
+    } catch {}
 
     res.json({
       status: "ok",

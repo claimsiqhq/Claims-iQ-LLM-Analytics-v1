@@ -33,11 +33,13 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
     fetchMorningBrief();
   }, [clientId]);
 
-  const fetchMorningBrief = async () => {
+  const fetchMorningBrief = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/morning-brief?client_id=${clientId}`);
+      const params = new URLSearchParams({ client_id: clientId });
+      if (forceRefresh) params.set("refresh", "true");
+      const response = await fetch(`/api/morning-brief?${params}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const json = await response.json();
       const data = json.data || json;
@@ -99,7 +101,7 @@ export const MorningBrief: React.FC<MorningBriefProps> = ({ clientId }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchMorningBrief}
+            onClick={() => fetchMorningBrief(true)}
             disabled={loading}
             className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label="Refresh brief"
