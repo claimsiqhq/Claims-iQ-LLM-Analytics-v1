@@ -9,7 +9,10 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:migrate:up": "tsx supabase/migrate.ts up",
+    "db:migrate:down": "tsx supabase/migrate.ts down",
+    "db:migrate:list": "tsx supabase/migrate.ts list"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
